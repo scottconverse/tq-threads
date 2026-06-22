@@ -46,7 +46,7 @@
 TQ_THREADS_VERSION = "0.2.0";
 
 // sqrt(3)/2 : height of a sharp 60-degree V per unit pitch (H = 0.86603 * P)
-TQ_H = 0.86602540378;
+_TQ_H = 0.86602540378;
 
 // quality floor for thread flanks when $fn is unset (OpenSCAD's own floor is 5)
 TQ_MIN_SEG = 24;
@@ -193,16 +193,19 @@ module tq_thread(d, pitch, length,
     P   = pitch;
     cf  = is_undef(crest_flat) ? P/8 : crest_flat;
     rf  = is_undef(root_flat)  ? P/4 : root_flat;
-    h   = (P - cf - rf) * TQ_H;                       // radial flank height
+    h   = (P - cf - rf) * _TQ_H;                      // radial flank height
     off = (internal ? +1 : -1) * clearance / 2;       // tolerance shift (radial)
     Rmaj = d/2 + off;
     Rmin = Rmaj - h;
+    // rounded roots dip ~0.5*rr below the flat minor radius; check the real valley
+    rmin_floor = (profile == "rounded") ? Rmin - 0.5 * round * 0.1443 * P : Rmin;
 
     assert(h > 0,
            "tq_thread: crest_flat + root_flat exceed pitch (no flank left)");
-    assert(Rmin > 0.05,
+    assert(rmin_floor > 0.05,
            str("tq_thread: thread too deep for d=", d, " pitch=", pitch,
-               " (minor radius ", Rmin, " <= 0); use a bigger d or smaller pitch"));
+               " (effective minor radius ", rmin_floor,
+               " <= 0); use a bigger d or smaller pitch"));
 
     lead = starts * P;
     dir  = (hand == "left") ? -1 : 1;
@@ -439,7 +442,8 @@ module tq_standoff(d, pitch, length, od=undef, starts=1, hand="right",
 
 // Socket / hex / plain head bolt.  Thread runs Z 0..length; head sits below 0
 // with its drive face at z = -head_h.  Components overlap by EPS so the STL is
-// one coherent printable solid.
+// one coherent printable solid.  `drive="hex"` cuts a hex socket recess in the
+// socket head; any other value (e.g. "none") leaves a plain solid head.
 TQ_EPS = 0.02;
 module tq_bolt(d, pitch, length, head="socket", head_d=undef, head_h=undef,
                shank=0, drive="hex", hand="right", clearance=0.4,
@@ -459,7 +463,8 @@ module tq_bolt(d, pitch, length, head="socket", head_d=undef, head_h=undef,
         else if (head == "socket")
             difference() {
                 translate([0,0,-hh]) cylinder(h=hh + TQ_EPS, d=hd, $fn=_tq_aseg(hd, fn));
-                translate([0,0,-hh - TQ_EPS]) tq_hex_drive(tq_hex_key_af(d), hh*0.6 + TQ_EPS);
+                if (drive == "hex")
+                    translate([0,0,-hh - TQ_EPS]) tq_hex_drive(tq_hex_key_af(d), hh*0.6 + TQ_EPS);
             }
         else if (head != "none")
             translate([0,0,-hh]) cylinder(h=hh + TQ_EPS, d=hd, $fn=_tq_aseg(hd, fn));
@@ -640,7 +645,7 @@ module tq_bottle_thread(d, pitch, length, starts=1, hand="right",
 module tq_thread_debug(d, pitch, length, starts=1, hand="right", profile="flat",
                        clearance=0.4, fn=undef) {
     P    = pitch;  cf = P/8;  rf = P/4;
-    h    = (P - cf - rf) * TQ_H;
+    h    = (P - cf - rf) * _TQ_H;
     Rmaj = d/2 - clearance/2;
     Rmin = Rmaj - h;
     lead = starts * P;
@@ -649,8 +654,8 @@ module tq_thread_debug(d, pitch, length, starts=1, hand="right", profile="flat",
 
     echo(str("== tq_thread_debug: ", d, " x ", pitch, " mm =="));
     echo(major_dia = 2*Rmaj, minor_dia = 2*Rmin,
-         pitch_dia = 2*(Rmaj - 0.375*TQ_H*P));
-    echo(thread_height_h = h, sharp_V_H = TQ_H*P,
+         pitch_dia = 2*(Rmaj - 0.375*_TQ_H*P));
+    echo(thread_height_h = h, sharp_V_H = _TQ_H*P,
          lead = lead, starts = starts, hand = hand);
 
     %tq_thread(d=d, pitch=pitch, length=length, starts=starts, hand=hand,
@@ -670,8 +675,8 @@ module tq_thread_debug(d, pitch, length, starts=1, hand="right", profile="flat",
             }
         }
     color("blue")
-        for (z = [0 : pitch : length])
-            translate([0, 0, z]) cylinder(h=0.2, r=Rmaj*1.05, $fn=na);
+        for (k = [0 : floor(length/pitch)])
+            translate([0, 0, k*pitch]) cylinder(h=0.2, r=Rmaj*1.05, $fn=na);
     color("green")
         translate([Rmaj*1.8, 0, 0]) rotate([90, 0, 0])
             linear_extrude(0.4)

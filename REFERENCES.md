@@ -31,6 +31,16 @@ H = (sqrt(3)/2) · P = 0.8660254 · P
 | Pitch-Ø offset from major | `2·(3H/8) = 0.75·H` | 0.649519·P |
 | Minor-Ø offset from major (basic) | `2·(5H/8) = 1.25·H` | 1.082532·P |
 | Rounded root radius (UNR/ISO) | `≈ 0.144·P` | 0.144·P |
+| Rounded crest radius (this lib) | `≈ 0.072·P` | 0.072·P |
+
+**Derivation of the rounded fillet radii** (used by `profile="rounded"`,
+`_tq_table_round`). The root fillet is the standard UNR/ISO value
+`rr ≈ 0.1443·P` — i.e. the radius of a circle tangent to both 60° flanks that
+fits the `H/4` root truncation: `(H/4)/(1/sin60° − 1)`-class geometry gives
+`≈ H/6 = 0.866·P/6 = 0.1443·P`. The crest fillet is taken at **half** that,
+`rc = rr/2 ≈ 0.0722·P`, matching the crest truncation being half the root
+truncation (`H/8` vs `H/4`). Both follow from the 60° triangle and `H`; neither
+is copied from any library.
 
 Standards:
 
@@ -118,7 +128,12 @@ helper exposes raw diameter/pitch/depth so you can dial in a drawing you hold).
 
 - No third-party OpenSCAD thread library (of any license) was opened, read,
   diffed, or used as a reference for naming, algorithms, comments, examples, or
-  tests.
+  tests. In particular, **Dan Kirshner's `threads.scad`, rcolyer's
+  `thread_profile` / `threadlib`, and BOSL2's `threading.scad` were not opened,
+  read, line-diffed, or used as a template.** tq-threads' construction is
+  structurally different from each (it builds one height-field `polyhedron`
+  rather than unioning per-tooth solids, sweeping a 2D profile along a helix, or
+  using a VNF/spiral-sweep framework).
 - All module/parameter names (`tq_thread`, `clearance`, `lead_in`, `starts`,
   `profile`, …) and the height-field construction were chosen independently from
   any existing library and from the standards' vocabulary.
