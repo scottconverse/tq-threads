@@ -22,7 +22,7 @@
 - **Clean‑room & standards‑based.** Written from public engineering standards only (ISO 68‑1, ISO 261/262, ISO 273, ISO 4032, ISO 4762, ISO 7089, ISO 10642, ASME B1.1). No third‑party thread library was copied or consulted — see [REFERENCES.md](REFERENCES.md).
 - **Manifold by construction.** The thread surface is a helical *height‑field* turned into one closed `polyhedron` (no boolean unions to go non‑manifold). It renders cleanly and slices.
 - **Printable‑first.** Fit clearance, internal‑oversize / external‑undersize compensation, lead‑in chamfers, rounded roots, and `$fn/$fa/$fs` resolution are all parameters.
-- **Batteries included.** Presets **M2–M64** + common fine pitches + UNC/UNF, plus bolts, nuts, washers, countersunk screws, clearance/counterbore/countersink holes, standoffs, couplers, wood screws, and a debug view.
+- **Batteries included.** Presets **M2–M64** + common fine pitches + UNC/UNF, plus bolts (hex/socket/**Phillips**), nuts, washers, countersunk & wood screws, **augers**, clearance/counterbore/countersink holes, standoffs, couplers, child‑difference wrappers (`tq_tap`/`tq_drill`/…), and a debug view. Custom flank **angle**, explicit **tooth_height**, and **taper** round out the profile controls.
 - **MIT licensed** → permissive *and* GPL‑2.0‑compatible, so it drops into a GPL‑2.0‑only project (e.g. TinkerQuarry) unchanged.
 
 <div align="center">
