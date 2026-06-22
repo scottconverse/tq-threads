@@ -249,6 +249,7 @@ tq_wood_screw(d,length,pitch,head="countersunk"|"pan",point=true,...);
 
 // drives, auger, relief (v0.3)
 tq_phillips_drive(size,depth);  tq_phillips_tip(size,shank_d,length);
+tq_ph_dims(size) -> [arm_reach,wing_width];  tq_ph_size_for(d) -> PH number;
 tq_auger(d,length,pitch,flight,taper=0,...);  tq_auger_hole(d,length,pitch,flight,through=true,...);
 tq_relief_groove(d,width,depth);
 

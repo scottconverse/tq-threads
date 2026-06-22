@@ -248,7 +248,9 @@ tq_phillips_tip(size=2, shank_d, length);        // driver-bit
 ```
 `drive` selects the head recess: `"hex"` (default), `"phillips"`, or `"none"`.
 The Phillips form is a clean-room printable approximation (see REFERENCES),
-sized by PH number; `tq_ph_size_for(d)` maps a diameter to a PH number.
+sized by PH number. Helper functions: `tq_ph_size_for(d)` maps a screw diameter
+to a PH number (0–4), and `tq_ph_dims(size)` returns `[arm_reach_mm,
+wing_width_mm]` for that PH number.
 
 ### Child-difference convenience wrappers
 Apply to `children()`; each cuts its hole at position `at` (default origin, axis +Z):

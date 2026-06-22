@@ -34,13 +34,11 @@ H = (sqrt(3)/2) · P = 0.8660254 · P
 | Rounded crest radius (this lib) | `≈ 0.072·P` | 0.072·P |
 
 **Derivation of the rounded fillet radii** (used by `profile="rounded"`,
-`_tq_table_round`). The root fillet is the standard UNR/ISO value
-`rr ≈ 0.1443·P` — i.e. the radius of a circle tangent to both 60° flanks that
-fits the `H/4` root truncation: `(H/4)/(1/sin60° − 1)`-class geometry gives
-`≈ H/6 = 0.866·P/6 = 0.1443·P`. The crest fillet is taken at **half** that,
-`rc = rr/2 ≈ 0.0722·P`, matching the crest truncation being half the root
-truncation (`H/8` vs `H/4`). Both follow from the 60° triangle and `H`; neither
-is copied from any library.
+`_tq_table_round`). The root fillet uses the standard UNR/ISO-class rounded-root
+value `rr ≈ H/6 = 0.866·P/6 = 0.1443·P`. The crest fillet is taken at **half**
+that, `rc = rr/2 = H/12 ≈ 0.0722·P`, mirroring the crest truncation (`H/8`) being
+half the root truncation (`H/4`). Both are expressed directly in terms of the
+60° triangle height `H`; neither is copied from any library.
 
 Standards:
 
@@ -112,7 +110,8 @@ for sizes outside its table.
   1:16 taper (≈1.79° per side); `taper` lets you reproduce any linear taper, but
   this library does not implement NPT's specific truncated profile.
 - **Phillips (cross) recess** (`tq_phillips_drive`, `drive="phillips"`). The
-  cruciform recess concept (a central point plus four 90°-spaced wings that taper
+  cruciform recess concept (a central point plus two crossed full-width wings —
+  each spanning both arms of one axis — forming the four-armed cross, tapering
   toward the tip) is described by **ISO 4757** (cross recesses for screws) and
   the ANSI Type I Phillips standard. tq-threads builds an **approximate, clean-room**
   cruciform from OpenSCAD primitives (a tapered core + two crossed hulled wings)
