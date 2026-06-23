@@ -1,513 +1,886 @@
 <!-- SPDX-License-Identifier: MIT -->
-# tq-threads — User Manual
+# tq-threads User Manual
 
-Complete reference for the tq-threads OpenSCAD library. For a quick overview see
-[README.md](README.md); for provenance see [REFERENCES.md](REFERENCES.md).
+Professional reference for `tq-threads` v0.6.0, a clean-room MIT OpenSCAD
+library for printable screw threads, threaded holes, bolts, nuts, washers,
+couplers, augers, and related fastener geometry.
 
-**Contents**
+This manual is written for people who need to design printable threaded parts,
+audit the geometry model, or integrate the library into a generator such as
+TinkerQuarry. For source provenance and standards classification, see
+[REFERENCES.md](REFERENCES.md) and [PROVENANCE.md](PROVENANCE.md).
 
-1. [Installation](#installation)
-2. [Concepts](#concepts)
-3. [The core module: `tq_thread`](#api) ← full parameter reference
-4. [Presets & specs](#presets--specs)
-5. [Threaded primitives](#threaded-primitives)
-6. [Bolts & screws](#bolts--screws)
-7. [Holes, washers, rods & couplers](#holes-washers-rods--couplers)
-8. [Hardware dimension tables](#hardware-dimension-tables)
-9. [Hex & drive helpers](#hex--drive-helpers)
-10. [Resolution: `$fn` / `$fa` / `$fs`](#resolution)
-11. [FDM tolerance deep-dive](#fdm-deep-dive)
-12. [Heat-set inserts](#heat-set-inserts)
-13. [Integration with other OSS](#integration)
-14. [Migration from Dan Kirshner / rcolyer `threads.scad`](#migration)
-15. [Testing & CI](#testing--ci)
-16. [Troubleshooting](#troubleshooting)
-17. [Limitations & roadmap](#limitations--roadmap)
+![tq-threads architecture](docs/manual-architecture.svg)
+
+## Contents
+
+1. [What tq-threads is](#what-tq-threads-is)
+2. [Architecture](#architecture)
+3. [Installation](#installation)
+4. [Thread model](#thread-model)
+5. [Core API: `tq_thread`](#core-api-tq_thread)
+6. [Profile control](#profile-control)
+7. [Preset and measurement functions](#preset-and-measurement-functions)
+8. [Threaded primitives](#threaded-primitives)
+9. [Fasteners and screw forms](#fasteners-and-screw-forms)
+10. [Holes, washers, couplers, and convenience wrappers](#holes-washers-couplers-and-convenience-wrappers)
+11. [Drives, hex helpers, and debug tools](#drives-hex-helpers-and-debug-tools)
+12. [Resolution and performance](#resolution-and-performance)
+13. [FDM fit and print tuning](#fdm-fit-and-print-tuning)
+14. [Integration patterns](#integration-patterns)
+15. [Migration guide](#migration-guide)
+16. [Testing and release proof](#testing-and-release-proof)
+17. [Troubleshooting](#troubleshooting)
+18. [Limits and design honesty](#limits-and-design-honesty)
+
+---
+
+## What tq-threads is
+
+`tq-threads` is a single-file OpenSCAD library. At runtime you only need
+`tq_threads.scad`. The public API is namespaced with `tq_*` so it can coexist
+with BOSL2, NopSCADlib, custom part libraries, and code-generated OpenSCAD.
+
+The library is optimized for printable geometry:
+
+- Threads are generated as one closed `polyhedron`, not as many boolean-unioned
+  teeth.
+- External and internal threads use the same nominal model plus an explicit
+  diametral `clearance` value for FDM fit.
+- Named presets cover ISO metric coarse/fine and Unified UNC/UNF sizes.
+- Helpers build common printable parts: rods, tapped holes, nuts, bolts,
+  countersunk screws, wood-screw-like forms, washers, couplers, standoffs,
+  augers, bottle-style coarse threads, and clearance/counterbore/countersink
+  cutters.
+
+The library is not a metrology tool. It produces a nominal printable surface,
+not ISO/ASME min/max tolerance envelopes. Where a feature is approximate or
+generic, this manual says so directly.
+
+---
+
+## Architecture
+
+The public API is intentionally layered. Most helpers reduce to the same core
+thread engine, which keeps behavior consistent across rods, bolts, nuts, tapped
+holes, and cutters.
+
+### System layers
+
+| Layer | Responsibility | Public examples |
+|---|---|---|
+| Consumer models | Your OpenSCAD model or generated code calls `tq_*` modules. | `include <tq_threads.scad>` |
+| Public API | Stable modules and lookup functions. | `tq_thread`, `tq_bolt`, `tq_nut`, `tq_threaded_hole` |
+| Core dispatch | Validates parameters, computes profile height, clearance/fit offset, lead, hand, taper, and profile table. | `tq_thread(...)` |
+| Geometry engine | Samples a helical height-field into one watertight polyhedron. | internal `_tq_thread_solid` |
+| Standards data | Nominal pitch/diameter/head/washer/clearance values and derived formulas. | `TQ_PRESETS`, `tq_clearance_dia`, `tq_shcs_head` |
+| Proof harness | Renders known cases, rejects invalid calls, and independently checks STL manifoldness. | `scripts/render_proof.ps1` |
+
+### How a call becomes mesh
+
+1. You call a helper such as `tq_thread_preset("M8", 20)` or
+   `tq_threaded_hole(6, 1.0, 12)`.
+2. Preset/helper code resolves dimensions and forwards to `tq_thread`.
+3. `tq_thread` validates inputs with `assert`, then computes:
+   - major/minor radii,
+   - clearance and optional ISO 965 position allowance,
+   - lead from `starts * pitch`,
+   - handedness,
+   - profile shape and radial depth,
+   - optional lead chamfers, taper, partial arc, and groove inversion.
+4. The geometry engine samples radius as a function of Z and angle:
+
+   ```text
+   r(z, theta) = profile(frac((z - dir * (theta / 360) * lead) / pitch))
+   ```
+
+5. OpenSCAD receives a single closed `polyhedron` with side faces and end caps.
+6. Wrappers use ordinary OpenSCAD `difference()` only for part-level operations
+   such as cutting a tapped hole or recessing a drive.
+
+This architecture is why the main thread body is robust: the thread itself is
+not an N-way boolean union of separate teeth.
+
+### Coordinate conventions
+
+- Thread axis is Z.
+- Default base is at `z=0`, length extends toward positive Z.
+- `center=true` centers the thread around `z=0`.
+- The start end is `z=0`; the far end is `z=length`.
+- `hand="right"` is the normal right-hand helix. Use `hand="left"` for
+  left-hand threads.
 
 ---
 
 ## Installation
 
-See [README → Install](README.md#install--use-as-a-library). In short: git
-submodule, copy onto the OpenSCAD library path, or vendor `tq_threads.scad`
-next to your model. Only `tq_threads.scad` is needed at runtime.
+### Use as a vendored file
+
+Copy `tq_threads.scad` next to your model:
 
 ```openscad
-include <tq_threads.scad>;   // brings in all modules + functions
+include <tq_threads.scad>;
 ```
 
-`include` (not `use`) is recommended so the preset/dimension **functions** and
-constants (`tq_preset`, `tq_in`, `TQ_PRESETS`, `TQ_THREADS_VERSION`) are visible.
+### Use as a project dependency
+
+```powershell
+git submodule add https://github.com/scottconverse/tq-threads libs/tq-threads
+```
+
+Then include it by relative path:
+
+```openscad
+include <libs/tq-threads/tq_threads.scad>;
+```
+
+### Use through `OPENSCADPATH`
+
+Put the repo directory on the OpenSCAD library path, then:
+
+```openscad
+include <tq_threads.scad>;
+```
+
+Use `include`, not `use`, when you need functions and constants such as
+`tq_preset`, `tq_in`, `TQ_PRESETS`, or `TQ_THREADS_VERSION`.
 
 ---
 
-## Concepts
+## Thread model
 
-A 60° thread is defined by its **major diameter** `d` and **pitch** `P`
-(crest-to-crest distance). tq-threads builds the thread as a single watertight
-`polyhedron`: the surface radius is a height-field over a cylinder,
+A conventional ISO/Unified V thread is described by a nominal major diameter
+`d`, pitch `P`, and a 60-degree included flank angle. The sharp triangle height
+is:
 
+```text
+H = sqrt(3) / 2 * P = 0.8660254 * P
 ```
-r(z, θ) = profile( frac( (z − dir·(θ/360)·lead) / P ) )
-```
 
-so multi-start (`lead = starts·P`), hand (`dir = ±1`), and crest/root shape (the
-`profile` lookup table) all fall out of one construction with no boolean unions.
+The default `profile="flat"` uses the ISO/UN basic form:
 
-- **External** thread = a bolt/rod (use the solid directly).
-- **Internal** thread = a nut/tapped hole (subtract a `tq_thread_cutter`).
-- **Clearance** is the printable fit allowance (see [FDM deep-dive](#fdm-deep-dive)).
+- crest flat: `P/8`
+- root flat: `P/4`
+- engaged radial depth: `5H/8 = 0.541266 * P`
+- nominal minor diameter: `d - 1.082532 * P`
+
+For FDM printing, the most important extra value is `clearance`. It is a total
+diametral fit allowance:
+
+- external thread radius shifts inward by `clearance / 2`,
+- internal thread/cutter radius shifts outward by `clearance / 2`.
+
+Make mating printed parts with the same `clearance` unless you intentionally
+want an asymmetric fit.
 
 ---
 
-## API
+## Core API: `tq_thread`
 
-### `tq_thread(d, pitch, length, …)`
+`tq_thread` is the one core module. It can render an external thread, an
+internal cutter, a partial thread, a multi-start thread, a groove, or a custom
+profile.
 
-The one module everything else is built on. Produces an **external** thread by
-default (or an oversize internal **cutter** with `internal=true`).
+```openscad
+tq_thread(d, pitch, length,
+          internal=false,
+          starts=1,
+          hand="right",
+          clearance=0.4,
+          fit=undef,
+          profile="flat",
+          angle=60,
+          tooth_height=undef,
+          minor_d=undef,
+          crest_flat=undef,
+          root_flat=undef,
+          round=1,
+          lead_in=true,
+          lead_out=true,
+          chamfer=undef,
+          taper=0,
+          arc=360,
+          fn=undef,
+          steps_per_pitch=16,
+          center=false,
+          thread_size=undef,
+          side_angle=undef,
+          rect_ratio=undef,
+          groove=false,
+          taper_rate=undef,
+          lead_ends=undef);
+```
+
+### Required parameters
+
+| Parameter | Meaning |
+|---|---|
+| `d` | Nominal major diameter in millimeters. |
+| `pitch` | Axial distance from one crest to the next, in millimeters. |
+| `length` | Threaded length along Z, in millimeters. |
+
+### Fit, handedness, and placement
 
 | Parameter | Default | Meaning |
-|---|---|---|
-| `d` | — | Nominal **major** diameter (mm). Crests reach `d/2` (minus tolerance). |
-| `pitch` | — | Thread pitch (mm), crest-to-crest. |
-| `length` | — | Threaded length along Z (mm). |
-| `internal` | `false` | `true` → oversize negative cutter for nuts/holes. |
-| `starts` | `1` | Number of thread starts (integer ≥ 1). `lead = starts·pitch`. |
+|---|---:|---|
+| `internal` | `false` | `false` renders an external thread. `true` renders an oversized internal cutter. |
+| `starts` | `1` | Number of starts. Lead is `starts * pitch`. |
 | `hand` | `"right"` | `"right"` or `"left"`. |
-| `clearance` | `0.4` | **Total diametral** FDM fit gap (mm); external shrinks `clearance/2`, internal grows `clearance/2`. |
-| `fit` | `undef` | Optional **ISO 965** tolerance *position* (allowance): external `"e"/"f"/"g"/"h"` or internal `"G"/"H"` (also accepts `"6g"`,`"6H"`,…; the grade digit is ignored — band width is not modelled). Applied on top of `clearance`. Case must match `internal`. This is nominal intent; M8 `6g` is only about 0.029 mm diametral shift, so tune `clearance` for real FDM fit. |
-| `profile` | `"flat"` | `"flat"` (ISO/UN basic), `"sharp"` (full V), `"rounded"` (filleted root/crest), `"square"`, `"rectangle"`/`"rect"`. |
-| `angle` | `60` | Included flank angle (degrees). 60 = ISO/UN; e.g. 55 ≈ Whitworth. Kept for backward compatibility. |
-| `side_angle` | `undef` | Half-angle measured from the plane perpendicular to the axis; `30` gives a 60-degree included V. Overrides `angle` for V-height derivation. |
-| `thread_size` | `pitch` | Axial width of one tooth/profile, independent of pitch. Must be `<= pitch`. |
-| `rect_ratio` | `1` square, `1/3` rectangle | Rectangular radial depth as a fraction of `thread_size`. |
-| `groove` | `false` | Invert the profile into a helical channel cut into the cylinder surface. |
-| `tooth_height` | `undef` | Explicit radial flight depth (mm). Overrides the angle-derived height. |
-| `minor_d` | `undef` | Set the core/minor diameter directly (mm, in `(0,d)`); thread depth becomes `(d − minor_d)/2`. |
-| `taper` | `0` | Total **diameter** reduction over the length (mm), applied linearly (base full, top reduced) — NPT-ish tapers / auger tips. |
-| `taper_rate` | `undef` | Diameter reduction per axial mm. `tq_npt_taper_rate()` returns `1/16`. Added to `taper`. |
-| `crest_flat` | `pitch/8` | Axial crest-flat width (mm) for `flat`. |
-| `root_flat` | `pitch/4` | Axial root-flat width (mm) for `flat`. |
-| `round` | `1` | Fillet scale for `profile="rounded"` (1 = standard ISO radii). |
-| `lead_in` | `true` | Taper the **start** (Z=0) end so the thread begins cleanly. |
-| `lead_out` | `true` | Taper the **far** (Z=length) end. |
-| `lead_ends` | `undef` | Optional selector `"none"`, `"start"`, `"end"`, or `"both"`; overrides `lead_in`/`lead_out` when set. |
-| `chamfer` | `=thread height` | Axial length of the lead taper(s). |
-| `arc` | `360` | Angular sweep in degrees; `<360` makes a partial arc. |
-| `fn` | `undef` | Per-call angular segment override (else `$fn`/`$fa`/`$fs`). |
-| `steps_per_pitch` | `16` | Axial sampling density (higher = crisper, heavier). |
-| `center` | `false` | Center the length on Z (`true`) vs. base at Z=0. |
+| `clearance` | `0.4` | Total diametral FDM fit allowance. |
+| `fit` | `undef` | Optional ISO 965 position allowance such as `"6g"` or `"6H"`. Grade width is not modeled. |
+| `center` | `false` | Center on Z instead of starting at `z=0`. |
 
-**Validation.** Bad inputs `assert` with a clear message instead of rendering
-malformed geometry: non-positive `d`/`pitch`/`length`/`steps_per_pitch`, `arc`
-outside `(0,360]`, `hand` not in `{right,left}`, `profile` not in
-`{flat,sharp,rounded,square,rect,rectangle}`, non-integer/`<1` `starts`,
-negative `clearance`/`chamfer`, invalid `side_angle`, `thread_size > pitch`,
-non-positive `rect_ratio`, flats exceeding the thread size, or a thread so deep
-the minor radius ≤ 0.
+### Profile shape
 
-**Geometry produced (flat profile).** Crest at `d/2`, engaged height
-`0.5413·P`, minor diameter `d − 1.0825·P` (ISO/UN basic). With `clearance`, the
-whole profile shifts radially by `±clearance/2`.
+| Parameter | Default | Meaning |
+|---|---:|---|
+| `profile` | `"flat"` | `"flat"`, `"sharp"`, `"rounded"`, `"square"`, `"rectangle"`, or `"rect"`. |
+| `angle` | `60` | Included flank angle, used unless `side_angle` is supplied. |
+| `side_angle` | `undef` | Half-angle measured from the plane perpendicular to the axis. `30` means a normal 60-degree V. |
+| `thread_size` | `pitch` | Axial width of one tooth/groove. Must be `<= pitch`. |
+| `rect_ratio` | context | Depth ratio for rectangular profile. Defaults to `1` for square and `1/3` for rectangle. |
+| `tooth_height` | `undef` | Direct radial depth override. |
+| `minor_d` | `undef` | Direct minor/core diameter override. |
+| `crest_flat` | context | Crest flat width. Defaults to `thread_size/8` except sharp uses `0`. |
+| `root_flat` | context | Root flat width. Defaults to `thread_size/4` except sharp uses `0`. |
+| `round` | `1` | Fillet scale for `profile="rounded"`. |
+| `groove` | `false` | Invert the selected profile into a helical channel. |
+
+### Ends, taper, and mesh controls
+
+| Parameter | Default | Meaning |
+|---|---:|---|
+| `lead_in` | `true` | Taper the start end. |
+| `lead_out` | `true` | Taper the far end. |
+| `lead_ends` | `undef` | `"none"`, `"start"`, `"end"`, or `"both"`. Overrides `lead_in`/`lead_out`. |
+| `chamfer` | thread height | Axial length of lead taper. |
+| `taper` | `0` | Total diameter reduction over the length. |
+| `taper_rate` | `undef` | Diameter reduction per axial millimeter. Added to `taper`. |
+| `arc` | `360` | Angular sweep. Use less than 360 for partial-arc threads. |
+| `fn` | `undef` | Per-call angular segment override. |
+| `steps_per_pitch` | `16` | Axial sampling density. |
+
+### Examples
 
 ```openscad
-tq_thread(8, 1.25, 20);                              // M8 rod
-tq_thread(8, 1.25, 20, hand="left", starts=2);       // 2-start left-hand
-tq_thread(8, 1.25, 20, profile="rounded", round=1);  // rounded roots
-tq_thread(8, 1.25, 20, arc=270);                     // 3/4 arc (split fittings)
-tq_thread(8, 1.25, 20, internal=true);               // raw cutter solid
+// M8 x 1.25 external rod, 20 mm long
+tq_thread(8, 1.25, 20);
+
+// Two-start left-hand thread
+tq_thread(8, 1.25, 20, starts=2, hand="left");
+
+// Cutter for a tapped hole
+difference() {
+    cube([20,20,12], center=true);
+    translate([0,0,-6]) tq_thread(6, 1.0, 14, internal=true);
+}
+
+// Rounded printable root
+tq_thread(10, 1.5, 20, profile="rounded");
+
+// Partial arc for a split clamp
+tq_thread(20, 2, 12, arc=210);
+```
+
+### Validation
+
+Bad inputs fail with OpenSCAD `assert` messages before generating malformed
+geometry. Common validations include:
+
+- positive `d`, `pitch`, `length`, and `steps_per_pitch`;
+- `arc` in `(0, 360]`;
+- `starts` integer and at least 1;
+- valid `hand`, `profile`, and `lead_ends`;
+- non-negative `clearance`, `chamfer`, `taper`, and `taper_rate`;
+- `thread_size <= pitch`;
+- positive `rect_ratio`;
+- valid internal/external `fit` case;
+- enough core radius left after depth, rounded root, and taper.
+
+---
+
+## Profile control
+
+The default is the standards-based flat V form. v0.6.0 adds generic printable
+profile controls for nonstandard but useful FDM shapes.
+
+### Profile quick reference
+
+| Goal | Parameters | Notes |
+|---|---|---|
+| ISO/UN basic V | `profile="flat"` | Default. Standards-derived nominal geometry. |
+| Full pointed V | `profile="sharp"` | Apex reaches major diameter. Not usually best for FDM strength. |
+| Rounded root/crest | `profile="rounded"` | Useful for stronger printed roots. |
+| Square tooth | `profile="square", thread_size=w` | Generic printable square form. Depth equals `thread_size`. |
+| Rectangular tooth | `profile="rectangle", thread_size=w, rect_ratio=r` | Depth is `w * r`. |
+| Narrow V on coarse helix | `thread_size < pitch, side_angle=30, profile="sharp"` | Pitch controls travel; `thread_size` controls tooth width. |
+| Helical groove | `groove=true` | Inverts the selected profile into the cylinder surface. |
+| Rate-based taper | `taper_rate=tq_npt_taper_rate()` | 1:16 diameter taper reference only. Not a full NPT profile. |
+
+### Side-angle convention
+
+`angle` is an included angle. `side_angle` is measured from the plane
+perpendicular to the axis. These are equivalent for symmetric V profiles:
+
+```text
+side_angle = angle / 2
+side_angle=30 => included angle 60
+```
+
+The radial height for a sharp V of axial tooth width `S` is:
+
+```text
+h = S / (2 * tan(side_angle))
+```
+
+### Groove mode
+
+`groove=true` does not subtract a separate swept cutter. It inverts the same
+height-field profile into the cylinder surface, so the result remains one direct
+polyhedron.
+
+```openscad
+// A helical channel around a 14 mm cylinder
+tq_thread(14, 4, 20,
+          profile="square",
+          thread_size=1.2,
+          groove=true,
+          lead_ends="both");
+```
+
+### Square and rectangular forms
+
+Square and rectangular profiles are generic printable forms. They are not
+standards-accurate ACME, trapezoidal, buttress, or pipe-thread profiles.
+
+```openscad
+// Square tooth
+tq_thread(12, 3, 20, profile="square", thread_size=1.5);
+
+// Shallow rectangular tooth
+tq_thread(12, 6, 20, profile="rectangle", thread_size=4, rect_ratio=1/3);
 ```
 
 ---
 
-## Presets & specs
+## Preset and measurement functions
+
+### Presets
 
 ```openscad
-tq_preset("M12")            // function -> [12, 1.75]  (or undef if unknown)
-tq_thread_preset("M12", 24) // module -> renders the M12 thread, 24 mm
-tq_thread_tpi(d=tq_in(1/4), tpi=20, length=12)        // by threads-per-inch
-tq_in(3/8)                  // 9.525  (inch -> mm)
-tq_preset_count()           // 101   (number of named presets)
-tq_presets_selfcheck()      // true  (every row resolves to its own values)
+tq_preset(name);             // -> [major_mm, pitch_mm] or undef
+tq_preset_count();           // -> 101
+tq_presets_selfcheck();      // -> true if every row resolves correctly
+tq_thread_preset(name, length, ...);
+tq_thread_tpi(d, tpi, length, ...);
+tq_in(inches);               // inch to mm
+tq_npt_taper_rate();         // -> 1/16
 ```
 
-`tq_thread_preset` and `tq_thread_tpi` forward `internal`, `starts`, `hand`,
-`clearance`, `profile`, `lead_in`, `lead_out`, `fn`, `center` to `tq_thread`.
-Use `assert(tq_presets_selfcheck())` to guard table integrity at parse time.
+`tq_thread_preset` and `tq_thread_tpi` forward the full v0.6 profile-control
+surface to `tq_thread`, including `fit`, `angle`, `minor_d`, `thread_size`,
+`side_angle`, `rect_ratio`, `groove`, `taper_rate`, and `lead_ends`.
 
-Preset list: see [README → Presets](README.md#presets). Add your own by editing
-the `TQ_PRESETS` table (`[name, major_mm, pitch_mm]`).
+```openscad
+tq_thread_preset("M8", 20);
+tq_thread_preset("M8x1", 20, clearance=0.3);
+tq_thread_preset("1/4-20", 12);
+tq_thread_tpi(d=tq_in(1/4), tpi=20, length=tq_in(1/2));
+tq_thread_preset("M8", 20, profile="square", thread_size=1);
+```
+
+### Hardware lookup functions
+
+| Function | Returns | Source |
+|---|---|---|
+| `tq_clearance_dia(size, fit="medium")` | Clearance hole diameter | ISO 273 |
+| `tq_washer_dims(size)` | `[inner_d, outer_d, thickness]` | ISO 7089 |
+| `tq_nut_thickness(size)` | Hex nut height | ISO 4032 |
+| `tq_nut_across_flats(size)` | Hex nut width across flats | ISO 4032 |
+| `tq_shcs_head(size)` | `[head_diameter, head_height]` | ISO 4762 |
+| `tq_hex_key_af(size)` | Hex-key across flats | ISO 4762 |
+| `tq_csk_head_dia(size)` | Countersunk head diameter | ISO 10642 |
+| `tq_hex_across_corners(af)` | Hex across-corners width from across-flats | Geometry |
+| `tq_hex_across_flats(ac)` | Hex across-flats width from across-corners | Geometry |
+| `tq_ph_dims(size)` | Approximate printable Phillips dimensions | Generic |
+| `tq_ph_size_for(d)` | Suggested Phillips size for screw diameter | Generic |
+
+Unknown hardware sizes use documented ratio fallbacks so custom dimensions still
+render, but listed ISO sizes should be preferred when you need nominal hardware
+compatibility.
 
 ---
 
 ## Threaded primitives
 
+### Rods, cutters, and holes
+
 ```openscad
-tq_threaded_rod(d, pitch, length, starts, hand, clearance, profile, fn, center);
-tq_thread_cutter(d, pitch, length, …, through=true, center=false);  // negative
-tq_threaded_hole(d, pitch, depth, …, through=true);                 // negative
-tq_nut(d, pitch, height=ISO4032, across_flats=ISO4032, chamfer=true, …);
-tq_standoff(d, pitch, length, od=d+4, …);                           // tapped boss
+tq_threaded_rod(d, pitch, length,
+                starts=1, hand="right", clearance=0.4,
+                profile="flat", fn=undef, center=false);
+
+tq_thread_cutter(d, pitch, length,
+                 starts=1, hand="right", clearance=0.4,
+                 profile="flat", fn=undef,
+                 through=true, center=false);
+
+tq_threaded_hole(d, pitch, depth,
+                 starts=1, hand="right", clearance=0.4,
+                 profile="flat", fn=undef, through=true);
 ```
 
-- **`tq_thread_cutter` / `tq_threaded_hole`** are the same oversize negative.
-  Put inside a `difference()`. `through=true` adds a 0.5 mm overshoot at both
-  ends for clean cuts; use `through=false` for blind holes.
-- **`tq_nut`** subtracts a cutter from a chamfered hex prism. Defaults to ISO
-  4032 thickness and across-flats for known sizes; both overridable.
+Use cutters and holes inside `difference()`:
 
 ```openscad
-difference() { my_part(); tq_threaded_hole(6, 1.0, 12); }    // tapped through-hole
-difference() { my_part(); tq_threaded_hole(6, 1.0, 8, through=false); }  // blind
+difference() {
+    translate([-10,-10,0]) cube([20,20,12]);
+    tq_threaded_hole(6, 1.0, 12);
+}
+```
+
+`through=true` overshoots by 0.5 mm on each end for clean boolean cuts.
+For blind holes, use `through=false` and make sure your model leaves enough
+depth for the lead-in and printed clearance.
+
+### Nuts and standoffs
+
+```openscad
+tq_nut(d, pitch,
+       height=undef, across_flats=undef,
+       starts=1, hand="right", clearance=0.4,
+       profile="flat", chamfer=true, fn=undef);
+
+tq_standoff(d, pitch, length,
+            od=undef, starts=1, hand="right",
+            clearance=0.4, profile="flat", fn=undef);
+```
+
+`tq_nut` defaults to ISO 4032 thickness and across-flats values when known.
+`tq_standoff` creates a cylindrical boss with a threaded bore.
+
+```openscad
+tq_nut(8, 1.25);
+tq_standoff(5, 0.8, 14, od=9);
 ```
 
 ---
 
-## Bolts & screws
+## Fasteners and screw forms
 
-All bolt/screw modules fuse head + (optional shank) + thread with a small
-`TQ_EPS` overlap so the export is **one coherent solid** (not merely-touching
-volumes). The thread's head-end is square (no taper) so it runs cleanly into the
-shank/head; the free end keeps its lead-in.
+### Machine bolts
 
 ```openscad
-tq_bolt(d, pitch, length, head="socket"|"hex"|"plain"|"none",
-        head_d, head_h, shank=0, drive="hex", hand, clearance, profile, fn);
-
-tq_countersunk_bolt(d, pitch, length, head_d=ISO10642, head_angle=90,
-                    shank=0, drive="hex", …);
-
-tq_wood_screw(d, length, pitch=0.6·d, head="countersunk"|"pan"|"none",
-              head_d=2·d, point="gimlet"|"cone"|"flat", taper=0, core_d,
-              thread_depth, shank=0, clearance=0, …);
+tq_bolt(d, pitch, length,
+        head="socket", head_d=undef, head_h=undef,
+        shank=0, drive="hex", hand="right",
+        clearance=0.4, profile="flat", fn=undef);
 ```
 
-- **`tq_bolt`** — socket head has a hex drive recess in the bearing face; head
-  defaults to ISO 4762 `dk`/`k` (socket) or ISO 4032 across-flats (hex). `shank`
-  is an unthreaded shoulder length (`< length`), diameter flush with the crests.
-  `drive="hex"|"phillips"|"none"`.
-- **`tq_countersunk_bolt`** — 90° flat head (ISO 10642 head diameter by default),
-  wide at the bearing face, narrowing into the thread. `drive` as above.
-- **`tq_wood_screw`** — coarse, sharp-profile, single-start screw. **Generic**
-  printable wood-screw-LIKE geometry, **not** a specific standard. Params:
-  `point` (`gimlet` sharp / `cone` blunt / `flat`; the old `point=true/false`
-  bool still works), `taper` (Ø reduction toward the tip), `core_d` (root Ø) or
-  `thread_depth` (radial depth), and `shank` (smooth unthreaded length under the
-  head). `clearance=0` (it forms its own mating thread).
+Head choices:
+
+- `"socket"`: cylindrical socket head, default ISO 4762 dimensions.
+- `"hex"`: external hex head, using ISO 4032 across-flats as the default size.
+- `"plain"`: plain cylindrical head.
+- `"none"`: no head; useful when you need a custom head shape.
+
+`drive` selects the recess on socket/plain heads:
+
+- `"hex"`: hex socket;
+- `"phillips"`: printable cruciform approximation;
+- `"none"`: no recess.
 
 ```openscad
-tq_bolt(8, 1.25, 20, head="socket", shank=5);
+tq_bolt(8, 1.25, 20, head="socket", shank=4);
 tq_bolt(6, 1.0, 16, head="hex");
+tq_bolt(5, 0.8, 12, drive="phillips");
+```
+
+### Countersunk screws
+
+```openscad
+tq_countersunk_bolt(d, pitch, length,
+                    head_d=undef, head_angle=90,
+                    shank=0, drive="hex", hand="right",
+                    clearance=0.4, profile="flat", fn=undef);
+```
+
+The default head diameter follows ISO 10642 for known metric sizes. The head is
+a cone whose bearing face is below `z=0`, narrowing to the thread/shank at
+`z=0`.
+
+```openscad
 tq_countersunk_bolt(5, 0.8, 16);
-tq_wood_screw(4, 18);
+tq_countersunk_bolt(6, 1.0, 18, drive="phillips");
 ```
+
+### Generic wood/self-tapping screw
+
+```openscad
+tq_wood_screw(d, length,
+              pitch=undef, head="countersunk", head_d=undef,
+              point="gimlet", taper=0, core_d=undef,
+              thread_depth=undef, shank=0, hand="right",
+              clearance=0.0, fn=undef);
+```
+
+This is a generic printable wood-screw-like form, not a DIN/ANSI wood screw.
+The default pitch is `0.6 * d`; the thread is a coarse sharp-profile form with
+an explicit printable tooth depth. The point can be:
+
+- `"gimlet"`: sharp point;
+- `"cone"`: blunt conical point;
+- `"flat"`: no point;
+- `true` / `false`: compatibility aliases for `"gimlet"` / `"flat"`.
+
+```openscad
+tq_wood_screw(5, 20);
+tq_wood_screw(4, 18, point="cone", shank=5);
+tq_wood_screw(5, 24, core_d=3.2);
+```
+
+### Bottle and closure-style coarse threads
+
+```openscad
+tq_bottle_thread(d, pitch, length,
+                 starts=1, hand="right", clearance=0.4,
+                 depth_frac=0.6, tooth_height=undef,
+                 angle=60, profile="rounded", lead_in=undef,
+                 internal=false, fn=undef, center=false);
+```
+
+This is a generic printable cap/neck thread. It does not claim SPI, GPI, or ISO
+closure compatibility. Use exact sourced dimensions with `tq_thread` if you have
+a real bottle-finish drawing.
+
+### Augers
+
+```openscad
+tq_auger(d, length,
+         pitch=undef, flight=undef,
+         hand="right", profile="rounded",
+         starts=1, taper=0, fn=undef, center=false);
+
+tq_auger_hole(d, length,
+              pitch=undef, flight=undef,
+              hand="right", clearance=0.4,
+              fn=undef, through=true, center=false);
+```
+
+`tq_auger` is a generic deep coarse helical flight, useful for feed screws,
+visual augers, and nonstandard conveyance parts. It is not a named auger
+standard.
 
 ---
 
-## Holes, washers, rods & couplers
+## Holes, washers, couplers, and convenience wrappers
+
+### Clearance and head-recess cutters
 
 ```openscad
-tq_clearance_hole(size, depth, fit="close"|"medium"|"free", through=true);
-tq_recessed_clearance_hole(size, depth, head_d, head_h, fit, through);  // counterbore
-tq_countersunk_clearance_hole(size, depth, head_d, angle=90, fit, through);
-tq_washer(size, od=ISO7089, id=ISO7089, thk=ISO7089);
-tq_rod_start(d, pitch, length, …);    // chamfered entry, square top
-tq_rod_end(d, pitch, length, …);      // square bottom, chamfered finish
-tq_rod_coupler(d, pitch, length, od=d+5, …);   // internally-threaded sleeve
-tq_bottle_thread(d, pitch, length, starts=1, internal=false, depth_frac=0.6,
-                 tooth_height, angle=60, profile="rounded", lead_in, …);
+tq_clearance_hole(size, depth, fit="medium", fn=undef, through=true);
+
+tq_recessed_clearance_hole(size, depth,
+                           head_d=undef, head_h=undef,
+                           fit="medium", fn=undef, through=true);
+
+tq_countersunk_clearance_hole(size, depth,
+                              head_d=undef, angle=90,
+                              fit="medium", fn=undef, through=true);
 ```
 
-- **`tq_bottle_thread`** is **generic** printable closure-style threading (NOT
-  SPI/GPI/ISO). New params: `tooth_height` (explicit depth), `angle` (flank, for
-  flat/sharp `profile`), `profile` (`rounded` default), `lead_in` (defaults: ext
-  yes / int no), with `starts` and `internal`.
-
-- **Clearance holes** use ISO 273 diameters (`fit` selects close/medium/free);
-  drop them into a `difference()`.
-- **Recessed (counterbore)** adds a flat-bottom pocket for a cap head at the +Z
-  face; **countersink** adds a 90° cone at the +Z face. Both default to the
-  ISO head sizes + a small clearance.
-- **`tq_rod_start` / `tq_rod_end`** are convenience wrappers controlling which
-  end gets the lead-in chamfer — handy for building long rods in sections.
-- **`tq_rod_coupler`** is a round coupling nut to join two threaded rods.
+Use inside `difference()`:
 
 ```openscad
-difference() { plate(); tq_countersunk_clearance_hole(5, 8); }
-difference() { plate(); tq_recessed_clearance_hole(5, 12); }   // M5 cap screw
-tq_washer(8);                                                  // ISO 7089 M8
+difference() {
+    translate([-12,-12,0]) cube([24,24,8]);
+    tq_countersunk_clearance_hole(5, 8);
+}
 ```
+
+### Washers, rod ends, and couplers
+
+```openscad
+tq_washer(size, od=undef, id=undef, thk=undef, fn=undef);
+
+tq_rod_start(d, pitch, length,
+             hand="right", clearance=0.4,
+             profile="flat", fn=undef);
+
+tq_rod_end(d, pitch, length,
+           hand="right", clearance=0.4,
+           profile="flat", fn=undef);
+
+tq_rod_coupler(d, pitch, length,
+               od=undef, hand="right",
+               clearance=0.4, profile="flat", fn=undef);
+```
+
+`tq_rod_start` and `tq_rod_end` are useful for printing long rods as sections:
+one controls the lead chamfer at the start, the other at the end.
+
+### Child-difference wrappers
+
+These apply a cut to `children()`, similar in spirit to legacy `ScrewHole` and
+`ClearanceHole` wrappers:
+
+```openscad
+tq_tap(d, pitch, depth,
+       at=[0,0,0], starts=1, hand="right",
+       clearance=0.4, profile="flat", through=true, fn=undef)
+    child();
+
+tq_drill(size, depth,
+         at=[0,0,0], fit="medium", through=true, fn=undef)
+    child();
+
+tq_counterbore(size, depth,
+               at=[0,0,0], head_d=undef, head_h=undef,
+               fit="medium", through=true, fn=undef)
+    child();
+
+tq_countersink(size, depth,
+               at=[0,0,0], head_d=undef, angle=90,
+               fit="medium", through=true, fn=undef)
+    child();
+```
+
+Example:
+
+```openscad
+tq_tap(8, 1.25, 12)
+    translate([-10,-10,0]) cube([20,20,12]);
+```
+
+### Relief groove
+
+```openscad
+tq_relief_groove(d, width=undef, depth=undef, fn=undef, center=true);
+```
+
+Use as a cutter at a thread runout so a nut can seat fully.
 
 ---
 
-## Augers, drives, child wrappers & relief (v0.3)
+## Drives, hex helpers, and debug tools
 
-### Custom profile controls
 ```openscad
-tq_thread(12, 2, 14, angle=55);            // 55° flank (Whitworth-ish)
-tq_thread(10, 2, 14, tooth_height=1.2);    // set the radial flight depth directly
-tq_thread(12, 1.75, 16, taper=3);          // cone: 3 mm dia reduction over the length
-tq_thread(10, 4, 14, thread_size=1, side_angle=30, profile="sharp"); // narrow 60-degree V
-tq_thread(12, 3, 14, profile="square", thread_size=1.5);
-tq_thread(12, 6, 14, profile="rectangle", thread_size=4, rect_ratio=1/3);
-tq_thread(14, 4, 14, profile="square", groove=true, lead_ends="both");
-tq_thread(12, 2, 14, taper_rate=tq_npt_taper_rate());
+tq_hex(af, h, center=false);
+tq_hex_drive(af, depth, center=false);
+tq_phillips_drive(size=2, depth=undef, center=false);
+tq_phillips_tip(size=2, shank_d=undef, length=undef, fn=undef);
+tq_thread_debug(d, pitch, length,
+                starts=1, hand="right", profile="flat",
+                clearance=0.4, fn=undef);
 ```
-`angle` (default 60) sets the included flank angle; the thread height derives
-from it. `side_angle` uses the alternate convention from the plane perpendicular
-to the axis, so `side_angle=30` maps to a 60-degree included V. `thread_size`
-decouples tooth width from pitch. `tooth_height` overrides radial height
-explicitly. `taper` and `taper_rate` shift the whole profile inward linearly
-along Z; `tq_npt_taper_rate()` is the 1:16 diameter-change reference rate only,
-not a full NPT profile. The minor-radius safety assert accounts for rounded
-roots and taper.
 
-### Auger / deep coarse flight
-```openscad
-tq_auger(d, length, pitch=d, flight=0.28·d, profile="rounded", starts=1, taper=0);
-tq_auger_hole(d, length, pitch, flight, through=true);   // negative for a channel
-```
-A generic deep, large-pitch helical flight (screw-conveyor / drill / feed-screw
-style) — `tq_thread` driven with a big pitch + explicit `tooth_height`. Not a
-specific auger standard.
-
-### Phillips (cross) drive
-```openscad
-tq_bolt(6, 1.0, 14, drive="phillips");           // bolt with a Phillips recess
-tq_countersunk_bolt(6, 1.0, 14, drive="phillips");
-tq_phillips_drive(size=2, depth);                // cruciform cutter / tip shape
-tq_phillips_tip(size=2, shank_d, length);        // driver-bit
-```
-`drive` selects the head recess: `"hex"` (default), `"phillips"`, or `"none"`.
-The Phillips form is a clean-room printable approximation (see REFERENCES),
-sized by PH number. Helper functions: `tq_ph_size_for(d)` maps a screw diameter
-to a PH number (0–4), and `tq_ph_dims(size)` returns `[arm_reach_mm,
-wing_width_mm]` for that PH number.
-
-### Child-difference convenience wrappers
-Apply to `children()`; each cuts its hole at position `at` (default origin, axis +Z):
-```openscad
-tq_tap(8, 1.25, 12)            cube([20,20,12]);              // threaded hole
-tq_drill(5, 8, at=[6,6,0])     cube([20,20,8]);               // clearance hole
-tq_counterbore(5, 12)          translate([-9,-9,0]) cube([18,18,12]);
-tq_countersink(5, 8)           translate([-9,-9,0]) cube([18,18,8]);
-```
-These are the ScrewHole/ClearanceHole idea expressed as original `tq_*` modules.
-
-### Thread-relief groove
-```openscad
-difference() { tq_thread(10,1.5,16); translate([0,0,5]) tq_relief_groove(10); }
-```
-A shallow runout groove so a mating nut can seat fully.
+`tq_thread_debug` emits useful diameter, pitch, height, lead, and resolution
+values via `echo` and renders a simple diagnostic thread. Use it when tuning a
+new profile or validating code-generated dimensions.
 
 ---
 
-## Hardware dimension tables
+## Resolution and performance
 
-Public lookup **functions** (return nominal ISO values; ratio fallback for
-unlisted sizes). Use them directly when you need a number:
+Angular resolution is selected in this order:
 
-| Function | Returns | Standard |
-|---|---|---|
-| `tq_clearance_dia(size, fit)` | clearance hole Ø (mm) | ISO 273 |
-| `tq_washer_dims(size)` | `[inner, outer, thickness]` | ISO 7089 |
-| `tq_nut_thickness(size)` | hex nut height `m` | ISO 4032 |
-| `tq_nut_across_flats(size)` | width across flats `s` | ISO 4032 |
-| `tq_shcs_head(size)` | `[dk, k]` socket head | ISO 4762 |
-| `tq_hex_key_af(size)` | hex-key across flats | ISO 4762 |
-| `tq_csk_head_dia(size)` | countersunk head Ø | ISO 10642 |
+1. explicit `fn=...`;
+2. `$fn` if set;
+3. derived from `$fa` and `$fs`;
+4. clamped to a minimum segment floor for printable smoothness.
+
+Axial resolution is controlled by `steps_per_pitch`. The default `16` is a good
+balance for printable parts. Increase it for large coarse threads or visual
+renders; decrease it for rough prototypes or very large parts.
 
 ```openscad
-echo(tq_nut_thickness(8));     // 6.8
-echo(tq_clearance_dia(5,"free"));  // 5.8
+$fn = 96;
+tq_thread(8, 1.25, 20);
+
+tq_thread(20, 4, 40, fn=128, steps_per_pitch=24);
+tq_thread(80, 6, 30, fn=96, steps_per_pitch=10);
 ```
+
+Performance tips:
+
+- Render one part at a time when testing.
+- Avoid large grids fused into one CGAL object.
+- Prefer split proof cells for CI.
+- Use `profile="rounded"` only where the extra profile segments matter.
+- Keep `fn` high enough for print quality but not arbitrarily high.
 
 ---
 
-## Hex & drive helpers
+## FDM fit and print tuning
+
+### Clearance starting points
+
+| Fit target | Suggested `clearance` |
+|---|---:|
+| Very well-tuned printer, snug fit | `0.2` to `0.3` mm |
+| General default | `0.4` mm |
+| Easy assembly / rougher printers | `0.5` to `0.6` mm |
+| Large caps and coarse closure threads | `0.5` to `0.8` mm |
+
+Print a quick M8 calibration set before committing a design:
 
 ```openscad
-tq_hex(af, h, center=false);            // hex prism by across-flats width
-tq_hex_drive(af, depth, center=false);  // hex socket tool (subtract)
-tq_hex_across_corners(af);              // AF -> AC width (function)
-tq_hex_across_flats(ac);               // AC -> AF width (function)
+for (i=[0:2])
+    translate([i*18,0,0])
+        tq_nut(8, 1.25, clearance=[0.3,0.4,0.5][i]);
 ```
 
----
+### Practical print advice
 
-## Resolution
+- Print thread axis vertical for the cleanest flanks.
+- Keep lead chamfers unless you need a square end for a joint.
+- Use rounded roots for load-bearing printed threads.
+- Use heat-set inserts for M3 and smaller, high-cycle assemblies, or high-torque
+  joints.
+- Avoid fine pitches below about 0.7 mm on a 0.4 mm nozzle unless the printer is
+  tuned and the part is low load.
 
-tq-threads honours the standard OpenSCAD special variables (this is **real
-`$fs` support**):
+### `fit=` versus `clearance`
 
-- `fn=` argument or `$fn > 0` → exactly that many angular segments.
-- Otherwise → `ceil(max(min(360/$fa, π·d/$fs), 5))`, clamped up to `TQ_MIN_SEG`
-  (24) so flanks stay smooth even on small diameters.
-
-`steps_per_pitch` controls **axial** sampling independently (raise for crisper
-flanks on big coarse threads; lower to shrink the mesh on large parts).
-
-```openscad
-$fn = 96;                         tq_thread(8,1.25,10);  // fixed 96 segments
-$fa = 6; $fs = 0.3;               tq_thread(8,1.25,10);  // fine auto resolution
-tq_thread(8,1.25,10, fn=120, steps_per_pitch=24);        // per-call override
-```
+`fit=` records ISO 965 tolerance-position intent. It does not model tolerance
+grade/band width. On M8 `6g`, the diametral allowance is about 0.029 mm, below
+typical FDM clearance and layer-line variation. Use `clearance` for actual
+printed fit.
 
 ---
 
-## FDM deep-dive
+## Integration patterns
 
-`clearance` = total diametral gap, split half to each mating part. A bolt and a
-nut generated with the **same** `clearance` share the gap.
+### BOSL2 and other OpenSCAD libraries
 
-- Internal **oversize**: `internal=true` adds `clearance/2` to every radius.
-- External **undersize**: `internal=false` removes `clearance/2`.
-- For asymmetric bias (you only print the bolt, or only the nut), set a different
-  `clearance` on each call, or set `clearance=0` and bake the allowance into `d`.
-
-`fit=` adds ISO 965 position allowance only. It is much smaller than common FDM
-clearance (M8 `6g` is about 0.029 mm diametral), so treat it as nominal intent
-and use `clearance` for actual print fit.
-
-Starting points: tuned printer 0.2–0.3, default 0.4, loose 0.5–0.6, caps 0.5–0.8
-mm. Print **axis vertical**; keep lead-in chamfers on; prefer `profile="rounded"`
-for load-bearing roots; below ~0.7 mm pitch consider a heat-set insert.
-
-A quick calibration cube: print M8 nuts at clearance 0.3/0.4/0.5 and keep the one
-that spins on freely without slop.
-
----
-
-## Heat-set inserts
-
-Use brass heat-set inserts (not a printed thread) when the hole is small/fine
-(≤ M3), assembled/disassembled often, needs high pull-out/torque, or threads
-across layer lines. For those, print a **smooth tapered pilot** sized to the
-insert spec:
-
-```openscad
-// pilot bore for a heat-set insert (size to your insert datasheet)
-difference() { boss(); cylinder(h=insert_depth, d=insert_pilot_d); }
-```
-
-`tq_standoff` with a plain (non-threaded) bore also works as a boss for inserts.
-Reserve `tq_threaded_hole` for printed threads ≥ M4 and coarse/cap threads.
-
----
-
-## Integration
-
-### Namespacing
-Every public symbol is `tq_*`, so tq-threads coexists with any other library.
-`include <tq_threads.scad>;` alongside others without clashes.
-
-### BOSL2 / BOSL
-Use BOSL2 for shapes, attachments, and rounding; use tq-threads for the actual
-printable threads. To thread a BOSL2 part, `difference()` a `tq_thread_cutter`
-out of it; tq-threads modules are ordinary children, so BOSL2's `attach()` /
-`position()` can place them.
+Use other libraries for shapes, attachments, fillets, and part catalogs. Use
+`tq-threads` where the part needs a real printable thread.
 
 ```openscad
 include <BOSL2/std.scad>
 include <tq_threads.scad>
+
 difference() {
-    cuboid([20,20,12], rounding=2);          // BOSL2
-    tq_threaded_hole(6, 1.0, 12);            // tq-threads
+    cuboid([24,24,12], rounding=2);
+    tq_threaded_hole(6, 1.0, 12);
 }
 ```
 
-### NopSCADlib / hardware catalogs
-Keep using those for cosmetic/visualization parts (bearings, fans, vitamins).
-Swap in tq-threads where you need a *printable* thread rather than a render-only
-one.
+### TinkerQuarry/code generation
 
-### TinkerQuarry
-MIT is GPL-2.0-compatible, so vendor `tq_threads.scad` into the engine's
-`library/` folder and `include` it from generated `.scad`. The plan→geometry
-step can call presets by name, e.g. `tq_thread_preset("M8", len)` or
-`tq_threaded_hole(d, pitch, depth)` for tapped features.
+Generated code should include the library and call explicit modules:
+
+```openscad
+include <tq_threads.scad>;
+tq_thread_preset("M8", 25, clearance=0.4);
+```
+
+Avoid template names such as "bolt" or "nut" if the generator emits smooth
+thread-relief blanks. To prove real threaded output, inspect the generated
+`.scad` and verify it contains a `tq_thread*` call.
 
 ### Slicers
-Export STL or 3MF; geometry is manifold, so no mesh-repair step is needed. Orient
-the thread **axis vertical** for the cleanest flanks.
+
+Export STL or 3MF as usual. The thread body is manifold by construction. For
+production release proof, use the render proof script and an actual slicer pass
+from the consuming product.
 
 ---
 
-## Migration
+## Migration guide
 
-Coming from Dan Kirshner / rcolyer `threads.scad`? tq-threads is a clean-room
-*feature* equivalent (different code and API). Rough mapping:
+This library is clean-room and has its own API. Use this table when porting
+models from older OpenSCAD thread libraries:
 
-| threads.scad-style call | tq-threads equivalent |
+| Old style | tq-threads |
 |---|---|
 | `metric_thread(diameter, pitch, length)` | `tq_thread(d=diameter, pitch=pitch, length=length)` |
 | `english_thread(dia_inch, tpi, len_inch)` | `tq_thread_tpi(d=tq_in(dia_inch), tpi=tpi, length=tq_in(len_inch))` |
-| `metric_thread(..., internal=true)` | `tq_thread(..., internal=true)` or `tq_thread_cutter(...)` |
-| `ScrewThread(od, len, pitch)` | `tq_thread(d=od, pitch=pitch, length=len)` |
-| `ScrewHole(od, len, pitch=...)` wrapper | `difference(){ part(); tq_threaded_hole(od, pitch, len); }` |
-| `RodStart` / `RodEnd` | `tq_rod_start` / `tq_rod_end` |
-| `*_taper` / leadin options | `lead_in`, `lead_out`, `chamfer` |
-| multi-start (`n_starts`) | `starts=` |
-| left-hand flag | `hand="left"` |
+| internal thread flag | `tq_thread(..., internal=true)` or `tq_thread_cutter(...)` |
+| screw-hole wrapper | `difference(){ part(); tq_threaded_hole(d,pitch,depth); }` |
+| rod-start/rod-end helpers | `tq_rod_start`, `tq_rod_end` |
+| multi-start | `starts=` |
+| left-hand | `hand="left"` |
+| per-side tolerance | one diametral `clearance` value |
 
-Notes:
-- tq-threads' `clearance` is a single diametral fit gap split half/half — tune it
-  rather than per-side tolerances.
-- Default profile is the ISO/UN **basic** (flat) form; use `profile="rounded"`
-  for a deeper rounded root.
-- v0.6 generic profile forms map as follows: `profile="sharp"` is a full-height
-  pointed V, `profile="square"` uses radial depth equal to `thread_size`, and
-  `profile="rectangle"` uses radial depth `thread_size * rect_ratio`.
+Default v0.6 behavior remains backward compatible for normal flat-profile calls.
+New profile controls are optional.
 
 ---
 
-## Testing & CI
+## Testing and release proof
 
-```sh
-openscad -o out.stl tq_threads_fast_tests.scad      # fast: asserts + small grid
-openscad -o demo.stl tq_threads_heavy_tests.scad    # heavy: full visual grid
-```
+### Fast local render
+
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts\render_proof.ps1          # full proof
-powershell -ExecutionPolicy Bypass -File scripts\render_proof.ps1 -Heavy   # add heavy grid
+$env:OPENSCADPATH = (Get-Location).Path
+openscad -o proof\selftest.stl tq_threads_selftest.scad
+openscad -o proof\fast00.stl -D TQ_FAST_PART=0 tq_threads_fast_tests.scad
 ```
-The proof captures both stdout and stderr from OpenSCAD, runs negative/assert
-tests, and checks every positive STL with the independent mesh edge-pairing
-checker. `scripts/render-tests.ps1` remains only as a deprecated compatibility
-alias. CI (`.github/workflows/ci.yml`) runs the same proof on every push.
+
+### Official proof
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\render_proof.ps1
+powershell -ExecutionPolicy Bypass -File scripts\render_proof.ps1 -Heavy
+```
+
+The proof:
+
+- captures stdout and stderr from OpenSCAD;
+- renders selftest, split fast cells, and example wrappers;
+- requires negative tests to fail with an actual `assert`;
+- writes generated test SCAD files without a UTF-8 BOM;
+- checks every positive STL with `scripts/check_stl_mesh.py`;
+- fails if OpenSCAD reports warnings/errors or non-manifold output.
+
+The CI workflow runs this proof on every push.
 
 ---
 
 ## Troubleshooting
 
-| Symptom | Cause / fix |
-|---|---|
-| `assert` failure on render | Read the message — it names the bad parameter. |
-| `thread_size must be <= pitch` | Narrow-tooth profiles can be smaller than pitch, but a single tooth cannot exceed one pitch. |
-| `side_angle must be > 0 and < 90` | `side_angle` is the half-angle from the plane perpendicular to the thread axis; use `30` for a conventional 60-degree V. |
-| `rect_ratio must be > 0` | Rectangular depth is `thread_size * rect_ratio`; use `1` for square or about `1/3` for shallow rectangular threads. |
-| `lead_ends must be none/start/end/both` | Use `lead_ends` for the common cases, or the older `lead_in` / `lead_out` booleans for compatibility. |
-| Thread too tight / loose when printed | Adjust `clearance` (see [FDM](#fdm-deep-dive)); recalibrate. |
-| Faceted / coarse flanks | Raise `$fn` or lower `$fs`; raise `steps_per_pitch`. |
-| Huge mesh / slow render | Lower `$fn`/`steps_per_pitch`; it's a height-field. |
-| Whole heavy grid STL takes minutes | Expected — N-way CGAL union; use F5 preview or render parts individually. |
-| "minor radius ≤ 0" assert | Pitch too large for that diameter; reduce pitch or increase `d`. |
-| Internal thread won't accept bolt | Match `clearance` on both parts; try +0.1 mm. |
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| Thread is too tight | FDM tolerance, over-extrusion, elephant foot, or insufficient clearance | Increase `clearance` by 0.1 mm; recalibrate flow; add lead chamfer. |
+| Thread is too loose | Clearance too high or printed external too small | Lower `clearance`; verify XY calibration. |
+| `thread_size must be <= pitch` | A tooth cannot occupy more than one pitch period | Reduce `thread_size` or increase `pitch`. |
+| `side_angle must be > 0 and < 90` | Invalid half-angle convention | Use `side_angle=30` for a 60-degree included V. |
+| `minor radius <= 0` | Thread depth, pitch, or taper leaves no printable core | Increase `d`, reduce `pitch`, reduce `tooth_height`, or reduce `taper`. |
+| Hole boolean leaves artifacts | Cutter is exactly flush with part face or wrong placement | Use `through=true`, overshoot manually, or translate cutter through the part. |
+| Mesh is huge | High `$fn`, high `steps_per_pitch`, large length/pitch count | Lower `fn` or `steps_per_pitch`; test one part at a time. |
+| Generated OpenSCAD cannot find the library | `OPENSCADPATH` or include path is wrong | Set `OPENSCADPATH` to the repo/vendor root or use a relative include. |
+| Negative test "passes" after parse error | Bad test harness, BOM, or not checking assert text | Use `render_proof.ps1`; it requires an actual `assert`. |
 
 ---
 
-## Limitations & roadmap
+## Limits and design honesty
 
-**Current limitations** (see also [README](README.md#limitations)):
-- Internal threads via external-form cutter (pragmatic for FDM, not metrology-grade).
-- Countersunk head diameters are nominal ISO 10642 values (overridable).
-- Square, rectangular, narrow-tooth, and groove profiles are generic printable
-  forms, not standards-accurate ACME/trapezoidal/buttress fit-class profiles.
-- `taper_rate` can express a 1:16 NPT-style diameter taper reference, but the
-  NPT truncated thread profile and sealing rules are not implemented.
+Exact or standards-derived:
 
-**Possible future work:** standards-accurate ACME/trapezoidal/buttress profiles,
-true ISO internal profile option, more named hardware presets, and more
-manufacturing-oriented relief presets. PRs and ideas welcome — see
-[CONTRIBUTING.md](CONTRIBUTING.md).
+- ISO/UN 60-degree basic geometry;
+- listed ISO metric and Unified preset dimensions;
+- listed ISO clearance/washer/nut/socket/countersunk nominal tables;
+- ISO 965 position allowance formulas for `fit=`.
+
+Approximate or generic:
+
+- square, rectangular, narrow-tooth, and groove profile forms;
+- bottle/closure thread helper;
+- wood/self-tapping screw helper;
+- auger helper;
+- Phillips recess approximation;
+- fallback dimensions for unlisted hardware sizes.
+
+Not implemented:
+
+- certified tolerance classes or gauge envelopes;
+- standards-accurate ACME/trapezoidal/buttress profiles;
+- full NPT sealing/gauging/thread profile;
+- SPI/GPI bottle finish compatibility;
+- physical print-fit certification.
+
+For certified or safety-critical threaded parts, use machined hardware or a
+metrology-grade manufacturing process. For printable fixtures, enclosures,
+caps, knobs, jigs, and prototypes, use the calibration workflow above and tune
+`clearance` per printer/material.

@@ -42,6 +42,13 @@ Flexible non-60-degree profile-control release.
   coarse sharp-profile default, so the stricter full-sharp-V semantics do not
   make the default/example non-renderable.
 
+### Documentation
+- Rebuilt the user manual as a full professional reference with architecture,
+  mental model, API usage, profile controls, print tuning, integration patterns,
+  proof workflow, and troubleshooting.
+- Added a dedicated manual architecture SVG and fixed landing-page inline-code
+  wrapping in feature cards.
+
 ## [0.5.0] - 2026-06-23
 
 Printability proof release for TinkerQuarry, plus two targeted geometry fixes.

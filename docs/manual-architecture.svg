@@ -1,0 +1,100 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 760" font-family="Segoe UI, Arial, sans-serif">
+  <defs>
+    <linearGradient id="g1" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0b2a4a"/>
+      <stop offset="1" stop-color="#0e5c45"/>
+    </linearGradient>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0,0 L12,6 L0,12 Z" fill="#607489"/>
+    </marker>
+    <style>
+      .title{font-size:28px;font-weight:700;fill:#fff}
+      .sub{font-size:14px;fill:#cfe3f2}
+      .lane{fill:#f7fafc;stroke:#d7e1ea;stroke-width:1.4}
+      .box{rx:10;stroke-width:1.5}
+      .h{font-size:15px;font-weight:700;fill:#102a43}
+      .t{font-size:12.5px;fill:#42566b}
+      .small{font-size:11.5px;fill:#5d6f82}
+      .cap{font-size:12px;font-weight:700;letter-spacing:.08em;fill:#52667a}
+    </style>
+  </defs>
+
+  <rect width="1180" height="760" fill="#ffffff"/>
+  <rect x="0" y="0" width="1180" height="86" fill="url(#g1)"/>
+  <text x="36" y="38" class="title">tq-threads architecture</text>
+  <text x="36" y="63" class="sub">A layered OpenSCAD thread library: public helpers reduce to one validated helical height-field engine.</text>
+
+  <text x="36" y="124" class="cap">CONSUMERS</text>
+  <rect x="28" y="138" width="1124" height="88" class="lane"/>
+  <g>
+    <rect x="52" y="160" width="210" height="44" fill="#eef6ff" stroke="#7aa6d8" class="box"/>
+    <text x="157" y="187" text-anchor="middle" class="h">OpenSCAD model</text>
+    <rect x="292" y="160" width="210" height="44" fill="#eef6ff" stroke="#7aa6d8" class="box"/>
+    <text x="397" y="187" text-anchor="middle" class="h">TinkerQuarry codegen</text>
+    <rect x="532" y="160" width="210" height="44" fill="#eef6ff" stroke="#7aa6d8" class="box"/>
+    <text x="637" y="187" text-anchor="middle" class="h">BOSL2 / NopSCADlib</text>
+    <rect x="772" y="160" width="210" height="44" fill="#eef6ff" stroke="#7aa6d8" class="box"/>
+    <text x="877" y="187" text-anchor="middle" class="h">STL / 3MF slicer</text>
+  </g>
+
+  <line x1="590" y1="226" x2="590" y2="258" stroke="#607489" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <text x="36" y="258" class="cap">PUBLIC API SURFACE</text>
+  <rect x="28" y="272" width="1124" height="166" fill="#f3f8fd" stroke="#b9d4ec" stroke-width="1.4"/>
+  <g>
+    <rect x="52" y="298" width="246" height="52" fill="#e4f0fb" stroke="#4a90c2" class="box"/>
+    <text x="70" y="321" class="h">Core + presets</text>
+    <text x="70" y="339" class="t">tq_thread, tq_thread_preset, tq_thread_tpi</text>
+
+    <rect x="326" y="298" width="246" height="52" fill="#e4f0fb" stroke="#4a90c2" class="box"/>
+    <text x="344" y="321" class="h">Fasteners</text>
+    <text x="344" y="339" class="t">tq_bolt, tq_countersunk_bolt, tq_wood_screw</text>
+
+    <rect x="600" y="298" width="246" height="52" fill="#e4f0fb" stroke="#4a90c2" class="box"/>
+    <text x="618" y="321" class="h">Threaded holes</text>
+    <text x="618" y="339" class="t">tq_threaded_hole, tq_tap, tq_thread_cutter</text>
+
+    <rect x="874" y="298" width="246" height="52" fill="#e4f0fb" stroke="#4a90c2" class="box"/>
+    <text x="892" y="321" class="h">Hardware helpers</text>
+    <text x="892" y="339" class="t">washers, nuts, couplers, counterbores</text>
+
+    <rect x="52" y="368" width="342" height="44" fill="#eef7f2" stroke="#62a982" class="box"/>
+    <text x="70" y="392" class="h">Profile controls</text>
+    <text x="215" y="392" class="t">flat, sharp, rounded, square, rectangle, groove</text>
+
+    <rect x="420" y="368" width="342" height="44" fill="#eef7f2" stroke="#62a982" class="box"/>
+    <text x="438" y="392" class="h">Fit controls</text>
+    <text x="560" y="392" class="t">clearance, fit, lead_ends, taper_rate</text>
+
+    <rect x="788" y="368" width="332" height="44" fill="#eef7f2" stroke="#62a982" class="box"/>
+    <text x="806" y="392" class="h">Nominal data</text>
+    <text x="926" y="392" class="t">ISO / ASME lookup functions</text>
+  </g>
+
+  <line x1="590" y1="438" x2="590" y2="470" stroke="#607489" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <text x="36" y="470" class="cap">CORE DISPATCH</text>
+  <rect x="230" y="486" width="720" height="76" fill="#d7f2ea" stroke="#1b9e77" stroke-width="2" class="box"/>
+  <text x="590" y="517" text-anchor="middle" class="h" style="font-size:18px">tq_thread(d, pitch, length, ...)</text>
+  <text x="590" y="540" text-anchor="middle" class="t">validate inputs, compute radii, fit offset, profile table, lead, hand, taper, arc, and sampling</text>
+
+  <line x1="590" y1="562" x2="590" y2="594" stroke="#607489" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <text x="36" y="594" class="cap">GEOMETRY ENGINE + PROOF</text>
+  <rect x="28" y="608" width="1124" height="100" fill="#fbf7ff" stroke="#cdbde6" stroke-width="1.4"/>
+  <g>
+    <rect x="52" y="632" width="330" height="52" fill="#eee6f8" stroke="#7b5ea7" class="box"/>
+    <text x="70" y="655" class="h">Helical height-field</text>
+    <text x="70" y="673" class="t">r(z, theta) sampled into one closed polyhedron</text>
+
+    <rect x="424" y="632" width="330" height="52" fill="#eee6f8" stroke="#7b5ea7" class="box"/>
+    <text x="442" y="655" class="h">Standards + derivations</text>
+    <text x="442" y="673" class="t">ISO 68-1/261/262/273/4032/4762/7089/10642, ASME B1.1</text>
+
+    <rect x="796" y="632" width="330" height="52" fill="#eee6f8" stroke="#7b5ea7" class="box"/>
+    <text x="814" y="655" class="h">Release proof</text>
+    <text x="814" y="673" class="t">OpenSCAD render, assert negatives, independent STL mesh check</text>
+  </g>
+
+  <text x="590" y="738" text-anchor="middle" class="small">Clean-room MIT implementation. Generic printable profile forms are documented separately from standards-exact nominal data.</text>
+</svg>
