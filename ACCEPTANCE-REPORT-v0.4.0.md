@@ -4,7 +4,7 @@
 **Library:** tq-threads (clean-room, MIT, GPL-2.0-compatible OpenSCAD thread library)
 **Canonical repo:** https://github.com/scottconverse/tq-threads
 **Release tag:** `v0.4.0`
-**Implementation commit:** `__COMMIT__`
+**Implementation commit:** `afda464357b7178866b0a4db318f6513957edd83`
 **Date:** 2026-06-22
 **OpenSCAD used:** 2021.01 (`_tools/openscad/openscad-2021.01/openscad.exe`)
 
