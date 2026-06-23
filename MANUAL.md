@@ -76,7 +76,7 @@ default (or an oversize internal **cutter** with `internal=true`).
 | `starts` | `1` | Number of thread starts (integer ≥ 1). `lead = starts·pitch`. |
 | `hand` | `"right"` | `"right"` or `"left"`. |
 | `clearance` | `0.4` | **Total diametral** FDM fit gap (mm); external shrinks `clearance/2`, internal grows `clearance/2`. |
-| `fit` | `undef` | Optional **ISO 965** tolerance *position* (allowance): external `"e"/"f"/"g"/"h"` or internal `"G"/"H"` (also accepts `"6g"`,`"6H"`,…; the grade digit is ignored — band width is not modelled). Applied on top of `clearance`. Case must match `internal`. |
+| `fit` | `undef` | Optional **ISO 965** tolerance *position* (allowance): external `"e"/"f"/"g"/"h"` or internal `"G"/"H"` (also accepts `"6g"`,`"6H"`,…; the grade digit is ignored — band width is not modelled). Applied on top of `clearance`. Case must match `internal`. This is nominal intent; M8 `6g` is only about 0.029 mm diametral shift, so tune `clearance` for real FDM fit. |
 | `profile` | `"flat"` | `"flat"` (ISO/UN basic), `"sharp"` (full V), `"rounded"` (filleted root/crest). |
 | `angle` | `60` | Included flank angle (degrees). 60 = ISO/UN; e.g. 55 ≈ Whitworth. Thread height derives from it. |
 | `tooth_height` | `undef` | Explicit radial flight depth (mm). Overrides the angle-derived height. |
@@ -348,6 +348,10 @@ nut generated with the **same** `clearance` share the gap.
 - External **undersize**: `internal=false` removes `clearance/2`.
 - For asymmetric bias (you only print the bolt, or only the nut), set a different
   `clearance` on each call, or set `clearance=0` and bake the allowance into `d`.
+
+`fit=` adds ISO 965 position allowance only. It is much smaller than common FDM
+clearance (M8 `6g` is about 0.029 mm diametral), so treat it as nominal intent
+and use `clearance` for actual print fit.
 
 Starting points: tuned printer 0.2–0.3, default 0.4, loose 0.5–0.6, caps 0.5–0.8
 mm. Print **axis vertical**; keep lead-in chamfers on; prefer `profile="rounded"`

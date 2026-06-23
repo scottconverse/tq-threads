@@ -50,7 +50,9 @@ exact formula (e.g. external g: `es=-(15+11·P)` µm). Published ISO tables pres
 these rounded to whole µm; tq-threads uses the unrounded formula. The tolerance
 **grade** (band width, e.g. the “6” in “6g”) is **not** modelled — there is one
 nominal surface, not a min/max envelope. Small-pitch footnote exceptions in the
-standard (e for P≤0.45, f for P≤0.3) are not special-cased.
+standard (e for P≤0.45, f for P≤0.3) are not special-cased. For M8 `6g`, the
+diametral allowance is about 0.029 mm, so this is nominal standards intent rather
+than a practical FDM fit lever; tune `clearance` for printed fit.
 
 ---
 
