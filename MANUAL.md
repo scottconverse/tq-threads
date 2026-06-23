@@ -422,7 +422,7 @@ Keep using those for cosmetic/visualization parts (bearings, fans, vitamins).
 Swap in tq-threads where you need a *printable* thread rather than a render-only
 one.
 
-### TinkerQuarry / KimCad
+### TinkerQuarry
 MIT is GPL-2.0-compatible, so vendor `tq_threads.scad` into the engine's
 `library/` folder and `include` it from generated `.scad`. The plan→geometry
 step can call presets by name, e.g. `tq_thread_preset("M8", len)` or

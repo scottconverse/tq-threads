@@ -22,6 +22,11 @@ Make a bolt **and** its nut with the *same* `clearance` and they fit.
 - Print **axis vertical** for the cleanest flanks; no supports in tapped holes.
 - Keep lead-in chamfers on (default) so threads self-start.
 - `profile="rounded"` for stronger roots on load-bearing parts.
+- For v0.6 generic square/rectangular/groove forms, start with the same
+  `clearance` table, then adjust `thread_size` or `rect_ratio` for printable
+  flank thickness and strength.
+- `fit=` records nominal ISO 965 allowance intent only. On M8 `6g` it is about
+  0.029 mm diametral, so `clearance` is still the practical FDM fit lever.
 - Pitch < ~0.7 mm (fine M2–M3) is at a 0.4 mm nozzle's limit — print slow or use
   a heat-set insert.
 

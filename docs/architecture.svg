@@ -26,7 +26,7 @@
   </g>
   <g font-size="13.5" fill="#243b53" text-anchor="middle">
     <text x="124" y="124">your model.scad</text>
-    <text x="349" y="124">TinkerQuarry / KimCad</text>
+    <text x="349" y="124">TinkerQuarry</text>
     <text x="579" y="124">BOSL2 / NopSCADlib (interop)</text>
     <text x="810" y="124">slicer (STL / 3MF)</text>
   </g>
@@ -74,7 +74,7 @@
   <!-- ============ CORE ============ -->
   <rect x="220" y="346" width="500" height="60" rx="12" fill="#d7f2ea" stroke="#1b9e77" stroke-width="2.2"/>
   <text x="470" y="372" font-size="16" font-weight="700" fill="#0b5c43" text-anchor="middle">tq_thread(d, pitch, length, …)</text>
-  <text x="470" y="392" font-size="11.5" fill="#1b6f55" text-anchor="middle">input validation (assert) · tolerance split · profile + hand + starts + arc dispatch</text>
+  <text x="470" y="392" font-size="11.5" fill="#1b6f55" text-anchor="middle">input validation (assert) · clearance/fit · profile controls · hand/starts/arc dispatch</text>
 
   <line x1="470" y1="406" x2="470" y2="430" stroke="#6b7c8c" stroke-width="1.8" marker-end="url(#arrow)"/>
 
@@ -88,8 +88,8 @@
   </g>
   <g fill="#3a2a55">
     <text x="44" y="486" font-size="13" font-weight="700">profile tables (lookup)</text>
-    <text x="44" y="506" font-size="11.5" fill="#5a4781">flat (ISO/UN basic)</text>
-    <text x="44" y="522" font-size="11.5" fill="#5a4781">sharp · rounded (filleted)</text>
+    <text x="44" y="506" font-size="11.5" fill="#5a4781">flat (ISO/UN basic) · sharp · rounded</text>
+    <text x="44" y="522" font-size="11.5" fill="#5a4781">square · rectangle · groove · taper</text>
     <text x="334" y="486" font-size="13" font-weight="700">_tq_thread_solid</text>
     <text x="334" y="506" font-size="11.5" fill="#5a4781">helical height-field r(z,θ)</text>
     <text x="334" y="522" font-size="11.5" fill="#5a4781">→ ONE watertight polyhedron (2-manifold)</text>

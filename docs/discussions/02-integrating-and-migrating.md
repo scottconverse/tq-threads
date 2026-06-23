@@ -32,7 +32,22 @@ tq-threads is a clean-room **feature** equivalent (different code + API):
 
 Full table + parameters in the [MANUAL](../../MANUAL.md#migration).
 
-## TinkerQuarry / KimCad
+## v0.6 profile-control notes
+The compatibility default is still `profile="flat"` with the ISO/UN basic
+truncations. New controls are optional and forward through `tq_thread_preset()`
+and `tq_thread_tpi()`:
+
+```openscad
+tq_thread_preset("M8", 20, profile="square", thread_size=1);
+tq_thread_tpi(d=0.5*25.4, tpi=8, length=20, profile="rectangle", rect_ratio=1/3);
+tq_thread(14, 4, 20, profile="square", groove=true, lead_ends="both");
+```
+
+`side_angle=30` is a 60-degree included V using the half-angle-from-perpendicular
+convention. Square, rectangular, and groove profiles are generic printable
+forms, not standards-certified ACME/trapezoidal/buttress replacements.
+
+## TinkerQuarry
 MIT → GPL-2.0 compatible; vendor `tq_threads.scad` into the engine's `library/`
 and call presets by name from generated `.scad`.
 

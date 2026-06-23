@@ -138,7 +138,7 @@ with anything. Common combinations (full recipes in **[MANUAL.md](MANUAL.md#inte
 |---|---|
 | **BOSL2 / BOSL** | Use BOSL2 for attachments, rounding, and shapes; use tq‑threads for the actual threads. No symbol clashes (`tq_*` vs BOSL2's names). Subtract `tq_thread_cutter()` from BOSL2 solids; the `tq_*` parts are normal children you can `attach()` around. |
 | **Migrating from Dan Kirshner / rcolyer `threads.scad`** | `metric_thread(d,p,l)` → `tq_thread(d,p,l)`; `english_thread()` → `tq_thread_tpi()`; `ScrewThread`/`ScrewHole` → `tq_thread` / `tq_threaded_hole`; `RodStart/RodEnd` → `tq_rod_start/tq_rod_end`. See the [migration table](MANUAL.md#migration). |
-| **TinkerQuarry / KimCad** | MIT → GPL‑2.0 compatible; vendor `tq_threads.scad` into `library/` and `include` it from generated `.scad`. The generator can call presets by name (`tq_thread_preset("M8", …)`). |
+| **TinkerQuarry** | MIT → GPL‑2.0 compatible; vendor `tq_threads.scad` into `library/` and `include` it from generated `.scad`. The generator can call presets by name (`tq_thread_preset("M8", …)`). |
 | **Slicers (Orca/Cura/Prusa/Bambu)** | Export STL/3MF; threads are manifold so no repair step is needed. Print **axis vertical** for best flanks. |
 | **NopSCADlib / hardware libs** | Use their part catalogs for visualization; use tq‑threads when you need a *printable* thread instead of a cosmetic one. |
 
