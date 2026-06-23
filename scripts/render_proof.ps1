@@ -42,7 +42,7 @@ function Resolve-OpenSCAD([string]$hint) {
 }
 
 $oscad = Resolve-OpenSCAD $OpenSCAD
-$outAbs = Join-Path $root $OutDir
+$outAbs = if ([System.IO.Path]::IsPathRooted($OutDir)) { $OutDir } else { Join-Path $root $OutDir }
 New-Item -ItemType Directory -Force -Path $outAbs | Out-Null
 # OpenSCAD prints --version to stderr; capture via redirect (no 2>&1 -> avoids
 # PowerShell 5.1 NativeCommandError noise).

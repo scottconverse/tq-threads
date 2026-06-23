@@ -120,10 +120,13 @@ tq_preset("M12")            // function -> [12, 1.75]  (or undef if unknown)
 tq_thread_preset("M12", 24) // module -> renders the M12 thread, 24 mm
 tq_thread_tpi(d=tq_in(1/4), tpi=20, length=12)        // by threads-per-inch
 tq_in(3/8)                  // 9.525  (inch -> mm)
+tq_preset_count()           // 101   (number of named presets)
+tq_presets_selfcheck()      // true  (every row resolves to its own values)
 ```
 
 `tq_thread_preset` and `tq_thread_tpi` forward `internal`, `starts`, `hand`,
 `clearance`, `profile`, `lead_in`, `lead_out`, `fn`, `center` to `tq_thread`.
+Use `assert(tq_presets_selfcheck())` to guard table integrity at parse time.
 
 Preset list: see [README → Presets](README.md#presets). Add your own by editing
 the `TQ_PRESETS` table (`[name, major_mm, pitch_mm]`).
@@ -167,18 +170,23 @@ tq_bolt(d, pitch, length, head="socket"|"hex"|"plain"|"none",
 tq_countersunk_bolt(d, pitch, length, head_d=ISO10642, head_angle=90,
                     shank=0, drive="hex", …);
 
-tq_wood_screw(d, length, pitch=0.6·d, head="countersunk"|"pan",
-              head_d=2·d, point=true, clearance=0, …);
+tq_wood_screw(d, length, pitch=0.6·d, head="countersunk"|"pan"|"none",
+              head_d=2·d, point="gimlet"|"cone"|"flat", taper=0, core_d,
+              thread_depth, shank=0, clearance=0, …);
 ```
 
 - **`tq_bolt`** — socket head has a hex drive recess in the bearing face; head
   defaults to ISO 4762 `dk`/`k` (socket) or ISO 4032 across-flats (hex). `shank`
   is an unthreaded shoulder length (`< length`), diameter flush with the crests.
+  `drive="hex"|"phillips"|"none"`.
 - **`tq_countersunk_bolt`** — 90° flat head (ISO 10642 head diameter by default),
-  wide at the bearing face, narrowing into the thread.
-- **`tq_wood_screw`** — coarse, sharp-profile, single-start screw with a gimlet
-  point carved by an envelope cone. Generic self-tapping/wood-style screw, **not**
-  a specific wood-screw standard. `clearance=0` (it forms its own mating thread).
+  wide at the bearing face, narrowing into the thread. `drive` as above.
+- **`tq_wood_screw`** — coarse, sharp-profile, single-start screw. **Generic**
+  printable wood-screw-LIKE geometry, **not** a specific standard. Params:
+  `point` (`gimlet` sharp / `cone` blunt / `flat`; the old `point=true/false`
+  bool still works), `taper` (Ø reduction toward the tip), `core_d` (root Ø) or
+  `thread_depth` (radial depth), and `shank` (smooth unthreaded length under the
+  head). `clearance=0` (it forms its own mating thread).
 
 ```openscad
 tq_bolt(8, 1.25, 20, head="socket", shank=5);
@@ -199,8 +207,14 @@ tq_washer(size, od=ISO7089, id=ISO7089, thk=ISO7089);
 tq_rod_start(d, pitch, length, …);    // chamfered entry, square top
 tq_rod_end(d, pitch, length, …);      // square bottom, chamfered finish
 tq_rod_coupler(d, pitch, length, od=d+5, …);   // internally-threaded sleeve
-tq_bottle_thread(d, pitch, length, internal=false, depth_frac=0.6, …);
+tq_bottle_thread(d, pitch, length, starts=1, internal=false, depth_frac=0.6,
+                 tooth_height, angle=60, profile="rounded", lead_in, …);
 ```
+
+- **`tq_bottle_thread`** is **generic** printable closure-style threading (NOT
+  SPI/GPI/ISO). New params: `tooth_height` (explicit depth), `angle` (flank, for
+  flat/sharp `profile`), `profile` (`rounded` default), `lead_in` (defaults: ext
+  yes / int no), with `starts` and `internal`.
 
 - **Clearance holes** use ISO 273 diameters (`fit` selects close/medium/free);
   drop them into a `difference()`.
