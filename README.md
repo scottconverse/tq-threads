@@ -47,7 +47,7 @@
 - [Limitations](#limitations)
 - [Versioning, contributing, license](#license--attribution)
 
-> Looking for the deep dive? The full **[user manual is in MANUAL.md](MANUAL.md)** — every parameter, every helper, integration recipes, and migration notes.
+> Looking for the deep dive? Use the polished **[web manual](https://scottconverse.github.io/tq-threads/manual.html)**. The repo also keeps **[MANUAL.md](MANUAL.md)** as the Markdown source/reference.
 
 ---
 
@@ -132,12 +132,12 @@ openscad -o rod.stl -D 'SHOW="bolt"' tq_threads_examples.scad
 ## Integrating with other OpenSCAD packages
 
 tq‑threads is a plain library with a `tq_`‑prefixed namespace, so it coexists
-with anything. Common combinations (full recipes in **[MANUAL.md](MANUAL.md#integration)**):
+with anything. Common combinations (full recipes in the **[web manual](https://scottconverse.github.io/tq-threads/manual.html#integration)**):
 
 | You use… | How tq‑threads fits |
 |---|---|
 | **BOSL2 / BOSL** | Use BOSL2 for attachments, rounding, and shapes; use tq‑threads for the actual threads. No symbol clashes (`tq_*` vs BOSL2's names). Subtract `tq_thread_cutter()` from BOSL2 solids; the `tq_*` parts are normal children you can `attach()` around. |
-| **Migrating from Dan Kirshner / rcolyer `threads.scad`** | `metric_thread(d,p,l)` → `tq_thread(d,p,l)`; `english_thread()` → `tq_thread_tpi()`; `ScrewThread`/`ScrewHole` → `tq_thread` / `tq_threaded_hole`; `RodStart/RodEnd` → `tq_rod_start/tq_rod_end`. See the [migration table](MANUAL.md#migration). |
+| **Migrating from Dan Kirshner / rcolyer `threads.scad`** | `metric_thread(d,p,l)` → `tq_thread(d,p,l)`; `english_thread()` → `tq_thread_tpi()`; `ScrewThread`/`ScrewHole` → `tq_thread` / `tq_threaded_hole`; `RodStart/RodEnd` → `tq_rod_start/tq_rod_end`. See the [migration table](https://scottconverse.github.io/tq-threads/manual.html#migration). |
 | **TinkerQuarry** | MIT → GPL‑2.0 compatible; vendor `tq_threads.scad` into `library/` and `include` it from generated `.scad`. The generator can call presets by name (`tq_thread_preset("M8", …)`). |
 | **Slicers (Orca/Cura/Prusa/Bambu)** | Export STL/3MF; threads are manifold so no repair step is needed. Print **axis vertical** for best flanks. |
 | **NopSCADlib / hardware libs** | Use their part catalogs for visualization; use tq‑threads when you need a *printable* thread instead of a cosmetic one. |
@@ -237,13 +237,13 @@ its nut with the **same** `clearance` and they fit.
 M8 `6g` shifts diameter by about 0.029 mm, below typical printed clearance and
 layer-line effects; tune `clearance` for real printed fit.
 
-Reach for **brass heat‑set inserts** instead of a printed thread when the hole is small/fine (≤ M3), the joint is assembled/disassembled often, you need high pull‑out/torque, or you're threading across layer lines (side walls). For those, print a smooth tapered pilot (a plain `cylinder()` or `tq_standoff` with a plain bore) sized to the insert spec and melt it in. Reserve `tq_threaded_hole` for printed threads ≥ M4 and coarse/cap threads. Details in [MANUAL.md](MANUAL.md#heat-set-inserts).
+Reach for **brass heat‑set inserts** instead of a printed thread when the hole is small/fine (≤ M3), the joint is assembled/disassembled often, you need high pull‑out/torque, or you're threading across layer lines (side walls). For those, print a smooth tapered pilot (a plain `cylinder()` or `tq_standoff` with a plain bore) sized to the insert spec and melt it in. Reserve `tq_threaded_hole` for printed threads ≥ M4 and coarse/cap threads. Details in the [web manual](https://scottconverse.github.io/tq-threads/manual.html#fit).
 
 ---
 
 ## API reference
 
-Concise list; **full signatures + every parameter are in [MANUAL.md](MANUAL.md#api)**.
+Concise list; **full signatures + every parameter are in the [web manual](https://scottconverse.github.io/tq-threads/manual.html#core-api)**.
 
 ```openscad
 // core (v0.6 adds square/rectangle/groove, thread_size, side_angle, taper_rate)

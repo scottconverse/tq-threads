@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<!-- SPDX-License-Identifier: MIT -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tq-threads Manual | Professional OpenSCAD Thread Library</title>
+<meta name="description" content="Professional user manual for tq-threads: architecture, APIs, profile controls, fit tuning, and release proof workflow.">
+<style>
+  :root{--ink:#122033;--mut:#596b80;--paper:#fff;--wash:#f5f8fb;--line:#dbe5ef;--nav:#0b2037;--nav2:#0f513f;--brand:#15936d;--blue:#2f74b5;--amber:#a86d00;--code:#0d1521;--codeink:#dce8f7;--soft:#eef7f3;--warn:#fff7e6}
+  *{box-sizing:border-box} html{scroll-behavior:smooth;overflow-x:hidden} body{margin:0;color:var(--ink);background:var(--wash);font:16px/1.65 Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;overflow-x:hidden}
+  a{color:var(--blue);text-decoration:none} a:hover{text-decoration:underline}
+  code,kbd{font:.92em ui-monospace,SFMono-Regular,Consolas,monospace;background:#edf3f8;border:1px solid #d8e3ed;border-radius:5px;padding:.08rem .28rem;overflow-wrap:anywhere}
+  pre{background:var(--code);color:var(--codeink);border-radius:10px;border:1px solid #21344d;padding:16px;overflow:auto;font:13.5px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace} pre code{background:transparent;border:0;padding:0;color:inherit;white-space:pre}
+  table{border-collapse:collapse;width:100%;margin:16px 0 24px;background:#fff;border:1px solid var(--line);border-radius:8px;overflow:hidden} th,td{border-bottom:1px solid var(--line);padding:10px 12px;text-align:left;vertical-align:top} th{background:#edf4fa;font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:#31465d} tr:last-child td{border-bottom:0}
+  .shell{display:grid;grid-template-columns:292px minmax(0,1fr);min-height:100vh}.side{position:sticky;top:0;height:100vh;overflow:auto;background:linear-gradient(180deg,var(--nav),var(--nav2));color:#dbeeff;padding:24px 20px}.brand{font-size:23px;font-weight:780;color:#fff;margin:0 0 4px}.version{display:inline-flex;gap:8px;align-items:center;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);border-radius:999px;padding:4px 10px;font-size:12px;color:#d7f7ed;margin:12px 0 22px}.side nav a{display:block;color:#dbeeff;padding:7px 8px;border-radius:7px;font-size:14px}.side nav a:hover{background:rgba(255,255,255,.1);text-decoration:none}.side .links{border-top:1px solid rgba(255,255,255,.16);margin-top:18px;padding-top:16px}.side .links a{display:block;margin:0 0 8px}
+  .main{min-width:0}.hero{background:linear-gradient(135deg,#10375c,#116047);color:#fff;padding:54px 56px 48px}.hero h1{font-size:46px;line-height:1.05;margin:0 0 12px;letter-spacing:-.02em}.hero p{max-width:880px;color:#d5e8f7;font-size:19px;margin:0}.hero .actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:24px}.btn{display:inline-flex;align-items:center;justify-content:center;border-radius:8px;padding:10px 14px;font-weight:700;border:1px solid rgba(255,255,255,.28);color:#fff}.btn.primary{background:var(--brand);border-color:var(--brand);color:#05261d}
+  .content{max-width:1060px;padding:38px 56px 80px} section{background:var(--paper);border:1px solid var(--line);border-radius:12px;margin:0 0 22px;padding:30px;box-shadow:0 8px 24px rgba(22,36,54,.04)} h2{font-size:30px;line-height:1.15;margin:0 0 18px;letter-spacing:-.01em} h3{font-size:20px;margin:28px 0 10px}.lead{font-size:18px;color:#3a5068;max-width:860px}.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.grid.two{grid-template-columns:repeat(2,minmax(0,1fr))}.card{border:1px solid var(--line);background:#fff;border-radius:10px;padding:16px;min-width:0}.card h3{font-size:16px;margin:0 0 6px}.card p{font-size:14px;color:var(--mut);margin:0}.callout{border-left:4px solid var(--brand);background:var(--soft);padding:14px 16px;border-radius:8px;margin:16px 0}.warning{border-left-color:var(--amber);background:var(--warn)}.kpi{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:24px 0 0}.kpi div{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.16);border-radius:10px;padding:14px}.kpi strong{display:block;color:#fff;font-size:22px}.kpi span{color:#d5e8f7;font-size:13px}.diagram{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px;margin:16px 0}.diagram img{width:100%;height:auto;display:block}.recipe{display:grid;grid-template-columns:260px minmax(0,1fr);gap:18px;align-items:start;border-top:1px solid var(--line);padding-top:18px;margin-top:18px}.recipe:first-of-type{border-top:0;padding-top:0}.recipe .why{color:var(--mut);font-size:14px}.small{font-size:13px;color:var(--mut)}
+  @media(max-width:940px){.shell{display:block}.side{position:relative;height:auto}.side nav{columns:2}.hero,.content{padding-left:22px;padding-right:22px}.grid,.grid.two,.kpi,.recipe{grid-template-columns:1fr}} @media print{body{background:#fff;color:#000}.shell{display:block}.side,.hero .actions{display:none}.hero{background:#fff;color:#000;padding:0 0 20px}.hero p{color:#333}.content{max-width:none;padding:0}section{box-shadow:none;break-inside:avoid}}
+</style>
+</head>
+<body>
+<div class="shell">
+  <aside class="side">
+    <div class="brand">tq-threads Manual</div><div>Printable OpenSCAD thread library</div><div class="version">v0.6.0 · MIT · clean-room</div>
+    <nav aria-label="Manual contents">
+      <a href="#overview">Overview</a><a href="#architecture">Architecture</a><a href="#install">Install</a><a href="#thread-model">Thread Model</a><a href="#core-api">Core API</a><a href="#profiles">Profile Control</a><a href="#presets">Presets & Lookups</a><a href="#primitives">Threaded Primitives</a><a href="#fasteners">Fasteners</a><a href="#holes">Holes & Wrappers</a><a href="#drives">Drives & Debug</a><a href="#fit">FDM Fit</a><a href="#integration">Integration</a><a href="#migration">Migration</a><a href="#proof">Proof Workflow</a><a href="#troubleshooting">Troubleshooting</a><a href="#limits">Limits</a>
+    </nav>
+    <div class="links"><a href="./">Landing page</a><a href="https://github.com/scottconverse/tq-threads/tree/v0.6.0">GitHub source</a><a href="https://github.com/scottconverse/tq-threads/blob/v0.6.0/MANUAL.md">Markdown source</a></div>
+  </aside>
+  <main class="main">
+    <header class="hero">
+      <h1>Professional User Manual</h1>
+      <p>Design, tune, and integrate printable screw threads in OpenSCAD with a single clean-room MIT library. This manual covers the architecture, mental model, complete API surface, print-fit workflow, and release proof process.</p>
+      <div class="kpi"><div><strong>101</strong><span>metric and Unified presets</span></div><div><strong>1</strong><span>core height-field engine</span></div><div><strong>69/69</strong><span>v0.6.0 proof tests passed</span></div><div><strong>MIT</strong><span>GPL-2.0 compatible</span></div></div>
+      <div class="actions"><a class="btn primary" href="#quickstart">Start Building</a><a class="btn" href="#core-api">API Reference</a><a class="btn" href="https://github.com/scottconverse/tq-threads/releases/tag/v0.6.0">Download v0.6.0</a></div>
+    </header>
+    <div class="content">
+      <section id="overview"><h2>Overview</h2><p class="lead">`tq-threads` creates printable threads as direct watertight geometry. It is built from public standards and first-principles geometry, with explicit FDM fit controls rather than hidden slicer assumptions.</p><div class="grid"><div class="card"><h3>Manifold by construction</h3><p>The thread body is one closed polyhedron sampled from a helical height-field.</p></div><div class="card"><h3>Printable first</h3><p>`clearance`, lead chamfers, rounded roots, and resolution controls are available at call sites.</p></div><div class="card"><h3>Clean-room MIT</h3><p>No third-party OpenSCAD thread library code, tables, comments, or API text were copied.</p></div></div><div id="quickstart" class="callout"><strong>Minimal use:</strong><pre><code>include &lt;tq_threads.scad&gt;;
+$fn = 64;
+
+tq_thread_preset("M8", 20);
+
+difference() {
+    cube([20,20,12], center=true);
+    tq_threaded_hole(6, 1.0, 12);
+}</code></pre></div></section>
+      <section id="architecture"><h2>Architecture</h2><p>The public modules are wrappers around one core engine. Presets, bolts, nuts, tapped holes, augers, and cutters all converge on `tq_thread`, so fit, handedness, profile selection, taper, starts, and validation stay consistent.</p><div class="diagram"><img src="manual-architecture.svg" alt="Layered tq-threads architecture diagram"></div><h3>How a call becomes mesh</h3><ol><li>A model calls a public module such as `tq_thread_preset("M8", 20)`.</li><li>The wrapper resolves nominal dimensions and forwards to `tq_thread`.</li><li>`tq_thread` validates inputs and computes radii, clearance, fit offset, lead, profile table, chamfers, taper, arc, and sampling density.</li><li>The engine samples `r(z, theta)` into side faces plus end caps.</li><li>OpenSCAD receives one closed polyhedron.</li></ol><pre><code>r(z, theta) = profile(frac((z - dir * (theta / 360) * lead) / pitch))</code></pre></section>
+      <section id="install"><h2>Installation</h2><div class="grid two"><div><h3>Vendor the file</h3><pre><code>include &lt;tq_threads.scad&gt;;</code></pre><p>Only `tq_threads.scad` is required at runtime.</p></div><div><h3>Use as a submodule</h3><pre><code>git submodule add https://github.com/scottconverse/tq-threads libs/tq-threads</code></pre><pre><code>include &lt;libs/tq-threads/tq_threads.scad&gt;;</code></pre></div></div><p>Use `include`, not `use`, when you need functions and constants such as `tq_preset`, `tq_in`, `TQ_PRESETS`, or `TQ_THREADS_VERSION`.</p></section>
+      <section id="thread-model"><h2>Thread Model</h2><p>The default profile is the ISO/UN basic 60-degree V. For pitch `P`, the sharp triangle height is `H = sqrt(3)/2 * P`. The flat basic profile uses crest flat `P/8`, root flat `P/4`, and engaged radial depth `5H/8`.</p><table><tr><th>Quantity</th><th>Formula</th><th>Meaning</th></tr><tr><td>Sharp V height</td><td>`0.8660254 * P`</td><td>Full theoretical triangle height.</td></tr><tr><td>Flat profile radial depth</td><td>`0.541266 * P`</td><td>Default engaged thread depth.</td></tr><tr><td>Nominal minor diameter</td><td>`d - 1.082532 * P`</td><td>Default flat external minor diameter before clearance.</td></tr><tr><td>Lead</td><td>`starts * pitch`</td><td>Axial advance per revolution.</td></tr></table><div class="warning callout"><strong>Fit reality:</strong> `fit=` records ISO 965 position intent. For FDM, actual fit is controlled by `clearance`, printer calibration, material, and orientation.</div></section>
+      <section id="core-api"><h2>Core API: `tq_thread`</h2><p>`tq_thread` renders an external thread by default. Set `internal=true` to render an oversized cutter for a tapped hole or nut.</p><pre><code>tq_thread(d, pitch, length,
+          internal=false, starts=1, hand="right",
+          clearance=0.4, fit=undef,
+          profile="flat", angle=60,
+          tooth_height=undef, minor_d=undef,
+          crest_flat=undef, root_flat=undef, round=1,
+          lead_in=true, lead_out=true, chamfer=undef,
+          taper=0, arc=360, fn=undef,
+          steps_per_pitch=16, center=false,
+          thread_size=undef, side_angle=undef,
+          rect_ratio=undef, groove=false,
+          taper_rate=undef, lead_ends=undef);</code></pre><table><tr><th>Group</th><th>Parameters</th><th>Use</th></tr><tr><td>Required</td><td>`d`, `pitch`, `length`</td><td>Nominal major diameter, pitch, and axial length.</td></tr><tr><td>Thread behavior</td><td>`internal`, `starts`, `hand`, `arc`, `center`</td><td>External/cutter mode, multi-start, handedness, partial arcs, placement.</td></tr><tr><td>Fit</td><td>`clearance`, `fit`</td><td>FDM diametral gap plus optional ISO 965 position allowance.</td></tr><tr><td>Profile</td><td>`profile`, `angle`, `side_angle`, `thread_size`, `rect_ratio`, `tooth_height`, `minor_d`</td><td>Shape and radial depth of the thread.</td></tr><tr><td>Ends and taper</td><td>`lead_in`, `lead_out`, `lead_ends`, `chamfer`, `taper`, `taper_rate`</td><td>Starting chamfers and linear diameter reduction.</td></tr><tr><td>Mesh</td><td>`fn`, `steps_per_pitch`</td><td>Angular and axial sampling.</td></tr></table><div class="recipe"><div><h3>External thread</h3><p class="why">A printable threaded rod.</p></div><pre><code>tq_thread(8, 1.25, 20);</code></pre></div><div class="recipe"><div><h3>Internal cutter</h3><p class="why">Subtract from a part.</p></div><pre><code>difference() {
+    part();
+    tq_thread(6, 1.0, 14, internal=true);
+}</code></pre></div><div class="recipe"><div><h3>Multi-start left-hand</h3><p class="why">Lead is `starts * pitch`.</p></div><pre><code>tq_thread(12, 2, 24, starts=3, hand="left");</code></pre></div></section>
+      <section id="profiles"><h2>Profile Control</h2><p>The default `flat` profile is the standards-based ISO/UN basic form. The other profiles are printable controls for real-world design needs.</p><table><tr><th>Goal</th><th>Parameters</th><th>Notes</th></tr><tr><td>ISO/UN basic V</td><td>`profile="flat"`</td><td>Default, standards-derived nominal geometry.</td></tr><tr><td>Full pointed V</td><td>`profile="sharp"`</td><td>Apex reaches major diameter.</td></tr><tr><td>Rounded roots</td><td>`profile="rounded"`</td><td>Better printed root strength.</td></tr><tr><td>Square tooth</td><td>`profile="square", thread_size=w`</td><td>Generic printable form; depth equals width.</td></tr><tr><td>Rectangular tooth</td><td>`profile="rectangle", rect_ratio=r`</td><td>Depth is `thread_size * rect_ratio`.</td></tr><tr><td>Helical groove</td><td>`groove=true`</td><td>Inverts the selected profile into the surface.</td></tr><tr><td>NPT-rate taper reference</td><td>`taper_rate=tq_npt_taper_rate()`</td><td>1:16 diameter taper only, not full NPT.</td></tr></table><pre><code>tq_thread(10, 4, 20, thread_size=1, side_angle=30, profile="sharp");
+tq_thread(12, 3, 20, profile="square", thread_size=1.5);
+tq_thread(12, 6, 20, profile="rectangle", thread_size=4, rect_ratio=1/3);
+tq_thread(14, 4, 20, profile="square", groove=true, lead_ends="both");</code></pre><div class="callout"><strong>Angle convention:</strong> `angle` is included angle. `side_angle` is half-angle measured from the plane perpendicular to the axis. `side_angle=30` maps to a conventional 60-degree included V.</div></section>
+      <section id="presets"><h2>Presets & Lookup Functions</h2><pre><code>tq_preset("M8");                  // [8, 1.25]
+tq_thread_preset("M8", 20);
+tq_thread_tpi(d=tq_in(1/4), tpi=20, length=tq_in(1/2));
+tq_preset_count();               // 101
+tq_presets_selfcheck();          // true</code></pre><table><tr><th>Function</th><th>Returns</th><th>Source</th></tr><tr><td>`tq_clearance_dia(size, fit)`</td><td>Clearance hole diameter</td><td>ISO 273</td></tr><tr><td>`tq_washer_dims(size)`</td><td>`[inner, outer, thickness]`</td><td>ISO 7089</td></tr><tr><td>`tq_nut_thickness(size)`</td><td>Hex nut height</td><td>ISO 4032</td></tr><tr><td>`tq_shcs_head(size)`</td><td>`[head_diameter, head_height]`</td><td>ISO 4762</td></tr><tr><td>`tq_csk_head_dia(size)`</td><td>Countersunk head diameter</td><td>ISO 10642</td></tr></table></section>
+      <section id="primitives"><h2>Threaded Primitives</h2><div class="grid two"><div class="card"><h3>`tq_threaded_rod`</h3><p>Plain external threaded rod.</p></div><div class="card"><h3>`tq_thread_cutter`</h3><p>Oversized internal cutter for subtraction.</p></div><div class="card"><h3>`tq_threaded_hole`</h3><p>Convenience cutter for tapped holes.</p></div><div class="card"><h3>`tq_nut` / `tq_standoff`</h3><p>Printed internally-threaded parts.</p></div></div><pre><code>difference() {
+    bracket();
+    tq_threaded_hole(6, 1.0, 12);
+}
+
+tq_nut(8, 1.25);
+tq_standoff(5, 0.8, 14, od=9);</code></pre></section>
+      <section id="fasteners"><h2>Fasteners</h2><table><tr><th>Module</th><th>Purpose</th><th>Important controls</th></tr><tr><td>`tq_bolt`</td><td>Socket, hex, plain, or headless machine bolt.</td><td>`head`, `head_d`, `head_h`, `shank`, `drive`.</td></tr><tr><td>`tq_countersunk_bolt`</td><td>Flat-head countersunk screw.</td><td>`head_d`, `head_angle`, `drive`, `shank`.</td></tr><tr><td>`tq_wood_screw`</td><td>Generic printable wood/self-tapping style screw.</td><td>`point`, `core_d`, `thread_depth`, `shank`, `taper`.</td></tr><tr><td>`tq_bottle_thread`</td><td>Generic coarse closure-style thread.</td><td>`starts`, `depth_frac`, `tooth_height`, `internal`.</td></tr><tr><td>`tq_auger`</td><td>Generic deep coarse helical flight.</td><td>`pitch`, `flight`, `starts`, `taper`.</td></tr></table><pre><code>tq_bolt(8, 1.25, 20, head="socket", shank=4);
+tq_countersunk_bolt(5, 0.8, 16, drive="phillips");
+tq_wood_screw(5, 20, point="cone", shank=4);
+tq_bottle_thread(28, 4, 10, starts=2);
+tq_auger(18, 80, pitch=18, flight=5);</code></pre></section>
+      <section id="holes"><h2>Holes, Washers, Couplers & Wrappers</h2><p>Clearance, counterbore, and countersink helpers are negative cutters. Child-difference wrappers apply the cutter directly to `children()`.</p><pre><code>tq_clearance_hole(5, 10, fit="medium");
+tq_recessed_clearance_hole(5, 12);
+tq_countersunk_clearance_hole(5, 8);
+tq_washer(8);
+tq_rod_coupler(8, 1.25, 18);
+
+tq_tap(8, 1.25, 12)
+    cube([24,24,12]);</code></pre></section>
+      <section id="drives"><h2>Drives, Hex Helpers & Debug</h2><p>Drive helpers are ordinary OpenSCAD solids intended for subtraction or visualization. The Phillips form is a printable approximation, not gauge-certified drive geometry.</p><table><tr><th>API</th><th>Use</th></tr><tr><td>`tq_hex(af, h)`</td><td>Hexagonal prism by across-flats width.</td></tr><tr><td>`tq_hex_drive(af, depth)`</td><td>Hex socket cutter.</td></tr><tr><td>`tq_phillips_drive(size, depth)`</td><td>Cruciform recess cutter or tip shape.</td></tr><tr><td>`tq_phillips_tip(size, shank_d, length)`</td><td>Printable driver-bit tip.</td></tr><tr><td>`tq_thread_debug(d, pitch, length)`</td><td>Echo diagnostic dimensions and render a visual thread.</td></tr></table><pre><code>difference() {
+    cylinder(h=6, d=12);
+    translate([0,0,-0.01]) tq_hex_drive(4, 3);
+}
+
+tq_phillips_tip(size=2);
+tq_thread_debug(8, 1.25, 12);</code></pre></section>
+      <section id="fit"><h2>FDM Fit & Print Tuning</h2><table><tr><th>Fit target</th><th>`clearance`</th><th>Use</th></tr><tr><td>Snug, tuned printer</td><td>0.2-0.3 mm</td><td>Careful calibration, slower prints.</td></tr><tr><td>General default</td><td>0.4 mm</td><td>Best first try.</td></tr><tr><td>Loose/easy assembly</td><td>0.5-0.6 mm</td><td>Rougher printers or larger parts.</td></tr><tr><td>Large caps/lids</td><td>0.5-0.8 mm</td><td>Coarse closure threads.</td></tr></table><ul><li>Print the thread axis vertical for clean flanks.</li><li>Use lead chamfers for self-starting threads.</li><li>Use `profile="rounded"` for stronger roots.</li><li>Use heat-set inserts for small, high-cycle, or high-torque holes.</li></ul></section>
+      <section id="integration"><h2>Integration Patterns</h2><h3>BOSL2 / NopSCADlib</h3><p>Use other libraries for shapes and catalogs; use tq-threads for printable thread geometry.</p><pre><code>include &lt;BOSL2/std.scad&gt;
+include &lt;tq_threads.scad&gt;
+
+difference() {
+    cuboid([24,24,12], rounding=2);
+    tq_threaded_hole(6, 1.0, 12);
+}</code></pre><h3>TinkerQuarry code generation</h3><p>Generated OpenSCAD should explicitly call `tq_thread*` APIs when a design requires real printed threads. Smooth bolt/nut blanks do not prove thread use.</p></section>
+      <section id="migration"><h2>Migration from Other OpenSCAD Thread Libraries</h2><p>`tq-threads` is a clean-room implementation with its own API. The table below maps common legacy call shapes to the `tq_*` surface.</p><table><tr><th>Old-style call</th><th>tq-threads equivalent</th></tr><tr><td>`metric_thread(diameter, pitch, length)`</td><td>`tq_thread(d=diameter, pitch=pitch, length=length)`</td></tr><tr><td>`english_thread(dia_inch, tpi, len_inch)`</td><td>`tq_thread_tpi(d=tq_in(dia_inch), tpi=tpi, length=tq_in(len_inch))`</td></tr><tr><td>Internal-thread flag</td><td>`tq_thread(..., internal=true)` or `tq_thread_cutter(...)`</td></tr><tr><td>Screw-hole wrapper</td><td>`difference(){ part(); tq_threaded_hole(d, pitch, depth); }`</td></tr><tr><td>Rod-start / rod-end helpers</td><td>`tq_rod_start(...)` / `tq_rod_end(...)`</td></tr><tr><td>Multi-start and left-hand options</td><td>`starts=...`, `hand="left"`</td></tr></table><div class="callout"><strong>Migration note:</strong> tune `clearance` as a total diametral allowance rather than per-side tolerance. The default flat profile is the compatibility profile; square, rectangular, groove, and narrow-tooth controls are optional v0.6 additions.</div></section>
+      <section id="proof"><h2>Testing & Release Proof</h2><pre><code>powershell -ExecutionPolicy Bypass -File scripts\render_proof.ps1
+powershell -ExecutionPolicy Bypass -File scripts\render_proof.ps1 -Heavy</code></pre><p>The proof captures stdout and stderr, renders split examples, requires negative tests to fail with real `assert` text, writes BOM-free generated SCAD, and checks every positive STL with the independent edge-pairing mesh checker.</p></section>
+      <section id="troubleshooting"><h2>Troubleshooting</h2><table><tr><th>Symptom</th><th>Fix</th></tr><tr><td>Thread too tight</td><td>Increase `clearance` by 0.1 mm, print axis vertical, verify extrusion and elephant foot.</td></tr><tr><td>Thread too loose</td><td>Lower `clearance`, verify XY calibration, check slicer horizontal expansion.</td></tr><tr><td>`thread_size must be <= pitch`</td><td>Reduce tooth width or increase pitch.</td></tr><tr><td>`minor radius <= 0`</td><td>Use larger `d`, smaller pitch, smaller `tooth_height`, or less taper.</td></tr><tr><td>OpenSCAD cannot find the library</td><td>Set `OPENSCADPATH` to the repo/vendor root or use a relative include path.</td></tr></table></section>
+      <section id="limits"><h2>Limits & Design Honesty</h2><div class="grid two"><div class="card"><h3>Exact or standards-derived</h3><p>ISO/UN 60-degree geometry, listed metric/Unified presets, listed ISO hardware dimensions, and ISO 965 position formulas.</p></div><div class="card"><h3>Generic printable forms</h3><p>Square, rectangular, groove, bottle, wood-screw, auger, Phillips, and fallback dimensions are intentionally approximate unless a standard is explicitly named.</p></div></div><div class="warning callout">For certified or safety-critical threaded parts, use machined hardware or a metrology-grade manufacturing workflow. For FDM parts, calibrate `clearance` per printer and material.</div></section>
+    </div>
+  </main>
+</div>
+</body>
+</html>

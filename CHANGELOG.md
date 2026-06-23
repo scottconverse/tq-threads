@@ -46,6 +46,8 @@ Flexible non-60-degree profile-control release.
 - Rebuilt the user manual as a full professional reference with architecture,
   mental model, API usage, profile controls, print tuning, integration patterns,
   proof workflow, and troubleshooting.
+- Added a designed web manual at `docs/manual.html` and wired the landing-page
+  Manual button to it.
 - Added a dedicated manual architecture SVG and fixed landing-page inline-code
   wrapping in feature cards.
 
