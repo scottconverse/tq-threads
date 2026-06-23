@@ -70,5 +70,17 @@ cell(24) tq_bottle_thread(24, 4, L);               // bottle thread
 cell(25) difference(){ translate([-7,-7,0]) cube([14,14,8]); tq_counterbore(5,8); }   // counterbore
 cell(26) difference(){ translate([-7,-7,0]) cube([14,14,8]); tq_countersink(5,8); }   // countersink
 
+// v0.6 profile-control smoke cases
+cell(27) tq_thread(10, 2, L, profile="square", thread_size=1.2, clearance=0);
+cell(28) tq_thread(10, 4, L, profile="rectangle", thread_size=1.5, rect_ratio=1/3, clearance=0);
+cell(29) tq_thread(10, 4, L, thread_size=1, side_angle=30, profile="sharp", clearance=0);
+cell(30) tq_thread(10, 3, L, profile="square", groove=true, clearance=0, lead_ends="both");
+cell(31) tq_thread(10, 2, L, taper_rate=tq_npt_taper_rate(), clearance=0);
+cell(32) tq_thread(10, 2, L, starts=6, clearance=0);
+cell(33) tq_thread(10, 2, L, lead_ends="start", clearance=0);
+cell(34) tq_thread(10, 2, L, internal=true, lead_ends="end", clearance=0);
+cell(35) tq_thread_preset("M8", L, profile="square", thread_size=0.8, clearance=0);
+cell(36) tq_thread_tpi(d=6, tpi=12, length=L, profile="rectangle", thread_size=1, rect_ratio=0.5, clearance=0);
+
 // preset-table self-check runs at parse time here too (belt and braces)
 assert(tq_presets_selfcheck(), "fast tests: preset self-check failed");

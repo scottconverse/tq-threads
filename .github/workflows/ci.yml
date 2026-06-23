@@ -9,7 +9,7 @@ on:
 
 jobs:
   render:
-    name: Render-proof (fast suite)
+    name: Render proof
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -20,32 +20,15 @@ jobs:
           sudo apt-get install -y openscad
           openscad --version
 
-      - name: Fast suite (preset assertions + smoke grid)
+      - name: Full render proof (split fast cells + examples + negative asserts + mesh checks)
+        shell: pwsh
         run: |
-          set -e
-          openscad -o fast.stl tq_threads_fast_tests.scad 2> fast.log || (cat fast.log; exit 1)
-          echo "--- OpenSCAD output ---"; cat fast.log
-          # fail on any manifold warning or error
-          if grep -Ei "WARNING|ERROR|not a valid 2-manifold" fast.log; then
-            echo "::error::OpenSCAD reported a warning/error"; exit 1
-          fi
-          test -s fast.stl
-          echo "Fast suite passed."
+          & ./scripts/render_proof.ps1 -OpenSCAD openscad -OutDir proof/ci
 
-      - name: Smoke-render a few examples
-        run: |
-          set -e
-          for id in bolt nut washer csk_bolt coupler; do
-            openscad -o "ex_$id.stl" -D "SHOW=\"$id\"" tq_threads_examples.scad 2> "ex_$id.log"
-            grep -Ei "WARNING|ERROR|not a valid 2-manifold" "ex_$id.log" && exit 1 || true
-            test -s "ex_$id.stl"
-          done
-          echo "Example smoke renders passed."
-
-      - name: Upload STL artifacts
+      - name: Upload proof artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: render-output
-          path: "*.stl"
+          name: render-proof-output
+          path: proof/ci
           if-no-files-found: ignore

@@ -4,6 +4,44 @@
 All notable changes to tq-threads. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com); versions are git tags.
 
+## [0.6.0] - 2026-06-23
+
+Flexible non-60-degree profile-control release.
+
+### Added
+- `profile="square"` and `profile="rectangle"` thread forms.
+- `thread_size=` to decouple one tooth's axial width from pitch, enabling
+  wide-pitch/narrow-tooth threads and grooves.
+- `rect_ratio=` for rectangular threads; `1` is square, `1/3` is shallow.
+- `groove=true` to make a helical channel cut into the cylinder surface as a
+  direct manifold height-field solid.
+- `side_angle=` for the half-angle measured from the plane perpendicular to the
+  axis. `side_angle=30` is the conventional 60-degree included V. Existing
+  `angle=60` remains the backward-compatible included-angle parameter.
+- `lead_ends="none"|"start"|"end"|"both"` as a clearer lead chamfer selector,
+  while retaining `lead_in` / `lead_out`.
+- `taper_rate=` plus `tq_npt_taper_rate()` (`1/16` diameter change per length)
+  for rate-based taper input.
+
+### Changed
+- The render proof now covers the new square, rectangular, groove, narrow-tooth,
+  six-start, lead-end, taper-rate, preset-wrapper, and TPI-wrapper cases.
+- `profile="sharp"` is now the documented full-height pointed V form. The
+  default flat ISO/UN profile remains unchanged for existing calls.
+- `tq_thread_preset()` and `tq_thread_tpi()` now forward the full v0.6 profile
+  controls (`thread_size`, `side_angle`, `rect_ratio`, `groove`, `taper_rate`,
+  `lead_ends`, and related overrides).
+- The official render proof now captures combined stdout/stderr from OpenSCAD,
+  enforces strict explicit `-OpenSCAD` paths, runs independent STL mesh checks
+  for every positive render, and is the CI proof used on push.
+
+### Fixed
+- `thread_size > pitch` is rejected consistently for square and rectangular
+  profiles before internal-thread relief or clamping is applied.
+- `tq_wood_screw()` now supplies an explicit printable tooth depth for its
+  coarse sharp-profile default, so the stricter full-sharp-V semantics do not
+  make the default/example non-renderable.
+
 ## [0.5.0] - 2026-06-23
 
 Printability proof release for TinkerQuarry, plus two targeted geometry fixes.

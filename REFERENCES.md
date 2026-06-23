@@ -25,6 +25,9 @@ below is labelled with one of four classes:
 |---|---|---|---|
 | 60° thread form, `H=(√3/2)·P` | DERIVED | ISO 68-1 | exact trig |
 | Custom flank angle `H=(P/2)/tan(α/2)` | DERIVED | trig | α=60 ⇒ ISO form |
+| `side_angle` V height `H=S/(2·tan(β))` | DERIVED | trig | β measured from the plane perpendicular to the axis; β=30 ⇒ 60° included V |
+| Square / rectangular profiles | DERIVED/APPROX | general screw-thread geometry | generic printable forms; no fit-class standard claimed |
+| Groove mode | DERIVED | geometry | same height-field profile inverted into the surface |
 | Flat profile truncations (crest `P/8`, root `P/4`, engaged `0.5413·P`) | EXACT | ISO 68-1 basic profile | |
 | Rounded fillets `rr=H/6`, `rc=H/12` | DERIVED | UNR/ISO-class | from 60° triangle |
 | Metric coarse major Ø + pitch (presets) | EXACT | ISO 261 | nominal |
@@ -41,7 +44,7 @@ below is labelled with one of four classes:
 | Auger flight (`tq_auger`) | APPROX/GENERIC | — | generic deep coarse flight, no standard |
 | Bottle/closure thread (`tq_bottle_thread`) | APPROX/GENERIC | — | generic; **not** SPI/GPI/ISO closure |
 | Wood/self-tapping screw (`tq_wood_screw`) | APPROX/GENERIC | — | generic printable, no standard |
-| Linear `taper` | DERIVED | geometry | NPT (ASME B1.20.1) is 1:16; NPT profile NOT implemented |
+| Linear `taper` / `taper_rate` | DERIVED | geometry / ASME B1.20.1 rate context | NPT diameter taper is 1:16; NPT profile NOT implemented |
 | Ratio fallbacks for unlisted hardware sizes | APPROX | — | `function` fallbacks; documented per function |
 
 **On `fit=` (ISO 965):** the implemented value is the *fundamental deviation*
@@ -176,6 +179,36 @@ for sizes outside its table.
 - **Child-difference wrappers** (`tq_tap`, `tq_drill`, `tq_counterbore`,
   `tq_countersink`) and `tq_relief_groove` are pure OpenSCAD `difference()`
   conveniences over the existing primitives — original code, `tq_*` named.
+
+### v0.6 additions — flexible profile controls
+
+- **`side_angle`** is the V flank half-angle measured from the plane
+  perpendicular to the thread axis. The radial height of a tooth of axial width
+  `S` is derived from the right triangle `h = S / (2*tan(side_angle))`;
+  `side_angle=30` therefore matches a conventional 60-degree included V when
+  `thread_size` spans the same axial width.
+- **`thread_size`** is the axial width of one tooth or groove. It may be smaller
+  than pitch to make narrow teeth on a coarse helix, but it is rejected when
+  greater than pitch because one tooth cannot occupy more than one pitch period
+  in this height-field model.
+- **`profile="sharp"`** is the full-height pointed V for the chosen width and
+  flank angle. The default `profile="flat"` ISO/UN form still uses the basic
+  crest/root truncations and remains the compatibility profile.
+- **`profile="square"`** uses radial depth equal to `thread_size`; this mirrors
+  the common square-thread naming convention where tooth width and depth are the
+  same in a generic printable form. No standards fit class is claimed.
+- **`profile="rectangle"`** uses radial depth `thread_size * rect_ratio`, so
+  `rect_ratio=1` is square and smaller values make shallower rectangular ridges.
+- **`groove=true`** inverts the same profile into the cylinder surface to form a
+  helical channel. It is still generated as one closed height-field polyhedron,
+  not as a boolean subtraction of a swept cutter.
+- **`lead_ends`** is a named selector over the existing lead-in/lead-out chamfer
+  behavior: `none`, `start`, `end`, or `both`. The old booleans remain accepted
+  for backward compatibility.
+- **`taper_rate`** expresses total diameter change per unit length; the helper
+  `tq_npt_taper_rate()` returns the published NPT reference rate of `1/16`.
+  This is a taper reference only. NPT's detailed truncated profile, sealing
+  rules, and gauging are out of scope.
 
 The coarse "bottle/jar" thread (`tq_bottle_thread`) is a **generic** printable
 rounded coarse thread, **not** a specific consumer-packaging finish. If you need

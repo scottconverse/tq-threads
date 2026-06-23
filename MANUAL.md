@@ -77,16 +77,22 @@ default (or an oversize internal **cutter** with `internal=true`).
 | `hand` | `"right"` | `"right"` or `"left"`. |
 | `clearance` | `0.4` | **Total diametral** FDM fit gap (mm); external shrinks `clearance/2`, internal grows `clearance/2`. |
 | `fit` | `undef` | Optional **ISO 965** tolerance *position* (allowance): external `"e"/"f"/"g"/"h"` or internal `"G"/"H"` (also accepts `"6g"`,`"6H"`,…; the grade digit is ignored — band width is not modelled). Applied on top of `clearance`. Case must match `internal`. This is nominal intent; M8 `6g` is only about 0.029 mm diametral shift, so tune `clearance` for real FDM fit. |
-| `profile` | `"flat"` | `"flat"` (ISO/UN basic), `"sharp"` (full V), `"rounded"` (filleted root/crest). |
-| `angle` | `60` | Included flank angle (degrees). 60 = ISO/UN; e.g. 55 ≈ Whitworth. Thread height derives from it. |
+| `profile` | `"flat"` | `"flat"` (ISO/UN basic), `"sharp"` (full V), `"rounded"` (filleted root/crest), `"square"`, `"rectangle"`/`"rect"`. |
+| `angle` | `60` | Included flank angle (degrees). 60 = ISO/UN; e.g. 55 ≈ Whitworth. Kept for backward compatibility. |
+| `side_angle` | `undef` | Half-angle measured from the plane perpendicular to the axis; `30` gives a 60-degree included V. Overrides `angle` for V-height derivation. |
+| `thread_size` | `pitch` | Axial width of one tooth/profile, independent of pitch. Must be `<= pitch`. |
+| `rect_ratio` | `1` square, `1/3` rectangle | Rectangular radial depth as a fraction of `thread_size`. |
+| `groove` | `false` | Invert the profile into a helical channel cut into the cylinder surface. |
 | `tooth_height` | `undef` | Explicit radial flight depth (mm). Overrides the angle-derived height. |
 | `minor_d` | `undef` | Set the core/minor diameter directly (mm, in `(0,d)`); thread depth becomes `(d − minor_d)/2`. |
 | `taper` | `0` | Total **diameter** reduction over the length (mm), applied linearly (base full, top reduced) — NPT-ish tapers / auger tips. |
+| `taper_rate` | `undef` | Diameter reduction per axial mm. `tq_npt_taper_rate()` returns `1/16`. Added to `taper`. |
 | `crest_flat` | `pitch/8` | Axial crest-flat width (mm) for `flat`. |
 | `root_flat` | `pitch/4` | Axial root-flat width (mm) for `flat`. |
 | `round` | `1` | Fillet scale for `profile="rounded"` (1 = standard ISO radii). |
 | `lead_in` | `true` | Taper the **start** (Z=0) end so the thread begins cleanly. |
 | `lead_out` | `true` | Taper the **far** (Z=length) end. |
+| `lead_ends` | `undef` | Optional selector `"none"`, `"start"`, `"end"`, or `"both"`; overrides `lead_in`/`lead_out` when set. |
 | `chamfer` | `=thread height` | Axial length of the lead taper(s). |
 | `arc` | `360` | Angular sweep in degrees; `<360` makes a partial arc. |
 | `fn` | `undef` | Per-call angular segment override (else `$fn`/`$fa`/`$fs`). |
@@ -96,8 +102,10 @@ default (or an oversize internal **cutter** with `internal=true`).
 **Validation.** Bad inputs `assert` with a clear message instead of rendering
 malformed geometry: non-positive `d`/`pitch`/`length`/`steps_per_pitch`, `arc`
 outside `(0,360]`, `hand` not in `{right,left}`, `profile` not in
-`{flat,sharp,rounded}`, non-integer/`<1` `starts`, negative `clearance`/`chamfer`,
-flats exceeding the pitch, or a thread so deep the minor radius ≤ 0.
+`{flat,sharp,rounded,square,rect,rectangle}`, non-integer/`<1` `starts`,
+negative `clearance`/`chamfer`, invalid `side_angle`, `thread_size > pitch`,
+non-positive `rect_ratio`, flats exceeding the thread size, or a thread so deep
+the minor radius ≤ 0.
 
 **Geometry produced (flat profile).** Crest at `d/2`, engaged height
 `0.5413·P`, minor diameter `d − 1.0825·P` (ISO/UN basic). With `clearance`, the
@@ -240,11 +248,20 @@ tq_washer(8);                                                  // ISO 7089 M8
 tq_thread(12, 2, 14, angle=55);            // 55° flank (Whitworth-ish)
 tq_thread(10, 2, 14, tooth_height=1.2);    // set the radial flight depth directly
 tq_thread(12, 1.75, 16, taper=3);          // cone: 3 mm dia reduction over the length
+tq_thread(10, 4, 14, thread_size=1, side_angle=30, profile="sharp"); // narrow 60-degree V
+tq_thread(12, 3, 14, profile="square", thread_size=1.5);
+tq_thread(12, 6, 14, profile="rectangle", thread_size=4, rect_ratio=1/3);
+tq_thread(14, 4, 14, profile="square", groove=true, lead_ends="both");
+tq_thread(12, 2, 14, taper_rate=tq_npt_taper_rate());
 ```
 `angle` (default 60) sets the included flank angle; the thread height derives
-from it. `tooth_height` overrides that height explicitly. `taper` shifts the
-whole profile inward linearly along Z (NPT-ish tapers, auger tips). The
-minor-radius safety assert accounts for both rounded roots and `taper`.
+from it. `side_angle` uses the alternate convention from the plane perpendicular
+to the axis, so `side_angle=30` maps to a 60-degree included V. `thread_size`
+decouples tooth width from pitch. `tooth_height` overrides radial height
+explicitly. `taper` and `taper_rate` shift the whole profile inward linearly
+along Z; `tq_npt_taper_rate()` is the 1:16 diameter-change reference rate only,
+not a full NPT profile. The minor-radius safety assert accounts for rounded
+roots and taper.
 
 ### Auger / deep coarse flight
 ```openscad
@@ -439,6 +456,9 @@ Notes:
   rather than per-side tolerances.
 - Default profile is the ISO/UN **basic** (flat) form; use `profile="rounded"`
   for a deeper rounded root.
+- v0.6 generic profile forms map as follows: `profile="sharp"` is a full-height
+  pointed V, `profile="square"` uses radial depth equal to `thread_size`, and
+  `profile="rectangle"` uses radial depth `thread_size * rect_ratio`.
 
 ---
 
@@ -449,12 +469,13 @@ openscad -o out.stl tq_threads_fast_tests.scad      # fast: asserts + small grid
 openscad -o demo.stl tq_threads_heavy_tests.scad    # heavy: full visual grid
 ```
 ```powershell
-pwsh scripts/render-tests.ps1            # fast suite, with manifold-warning check
-pwsh scripts/render-tests.ps1 -Heavy     # add the heavy grid
+powershell -ExecutionPolicy Bypass -File scripts\render_proof.ps1          # full proof
+powershell -ExecutionPolicy Bypass -File scripts\render_proof.ps1 -Heavy   # add heavy grid
 ```
-The fast suite also runs **compile-time assertions** that every required preset
-(M2…M64) resolves to the correct pitch. CI (`.github/workflows/ci.yml`) runs the
-fast suite on every push.
+The proof captures both stdout and stderr from OpenSCAD, runs negative/assert
+tests, and checks every positive STL with the independent mesh edge-pairing
+checker. `scripts/render-tests.ps1` remains only as a deprecated compatibility
+alias. CI (`.github/workflows/ci.yml`) runs the same proof on every push.
 
 ---
 
@@ -463,6 +484,10 @@ fast suite on every push.
 | Symptom | Cause / fix |
 |---|---|
 | `assert` failure on render | Read the message — it names the bad parameter. |
+| `thread_size must be <= pitch` | Narrow-tooth profiles can be smaller than pitch, but a single tooth cannot exceed one pitch. |
+| `side_angle must be > 0 and < 90` | `side_angle` is the half-angle from the plane perpendicular to the thread axis; use `30` for a conventional 60-degree V. |
+| `rect_ratio must be > 0` | Rectangular depth is `thread_size * rect_ratio`; use `1` for square or about `1/3` for shallow rectangular threads. |
+| `lead_ends must be none/start/end/both` | Use `lead_ends` for the common cases, or the older `lead_in` / `lead_out` booleans for compatibility. |
 | Thread too tight / loose when printed | Adjust `clearance` (see [FDM](#fdm-deep-dive)); recalibrate. |
 | Faceted / coarse flanks | Raise `$fn` or lower `$fs`; raise `steps_per_pitch`. |
 | Huge mesh / slow render | Lower `$fn`/`steps_per_pitch`; it's a height-field. |
@@ -477,8 +502,12 @@ fast suite on every push.
 **Current limitations** (see also [README](README.md#limitations)):
 - Internal threads via external-form cutter (pragmatic for FDM, not metrology-grade).
 - Countersunk head diameters are nominal ISO 10642 values (overridable).
-- No tapered pipe (NPT), ACME/trapezoidal, or buttress forms (60°-V only).
+- Square, rectangular, narrow-tooth, and groove profiles are generic printable
+  forms, not standards-accurate ACME/trapezoidal/buttress fit-class profiles.
+- `taper_rate` can express a 1:16 NPT-style diameter taper reference, but the
+  NPT truncated thread profile and sealing rules are not implemented.
 
-**Possible future work:** ACME/trapezoidal profile, true ISO internal profile
-option, more named hardware presets, and a parametric thread-relief groove. PRs
-and ideas welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
+**Possible future work:** standards-accurate ACME/trapezoidal/buttress profiles,
+true ISO internal profile option, more named hardware presets, and more
+manufacturing-oriented relief presets. PRs and ideas welcome — see
+[CONTRIBUTING.md](CONTRIBUTING.md).

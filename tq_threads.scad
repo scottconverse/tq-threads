@@ -43,7 +43,7 @@
 
 // Library version (filenames are fixed by the `include` API; version lives
 // here and in the git tag / CHANGELOG / GitHub release).
-TQ_THREADS_VERSION = "0.5.0";
+TQ_THREADS_VERSION = "0.6.0";
 
 // sqrt(3)/2 : height of a sharp 60-degree V per unit pitch (H = 0.86603 * P)
 _TQ_H = 0.86602540378;
@@ -110,11 +110,51 @@ function _tq_table_round(P, Rmin, Rmaj, rnd, nseg) =
               [ P + rr*cos(phi), rc0 + rr*sin(phi) ] ]        // root, left half
     );
 
+function _tq_table_narrow_sharp(P, S, Rmin, Rmaj) =
+    let(a = P/2 - S/2, b = P/2 + S/2)
+    [ [0, Rmin], [a, Rmin], [P/2, Rmaj], [b, Rmin], [P, Rmin] ];
+
+function _tq_table_narrow_flat(P, S, Rmin, Rmaj, cf, rf) =
+    let(
+        a  = P/2 - S/2,
+        b  = P/2 + S/2,
+        c1 = P/2 - cf/2,
+        c2 = P/2 + cf/2,
+        r1 = a + rf/2,
+        r2 = b - rf/2
+    )
+    [ [0, Rmin], [a, Rmin], [r1, Rmin], [c1, Rmaj],
+      [c2, Rmaj], [r2, Rmin], [b, Rmin], [P, Rmin] ];
+
+function _tq_table_rect(P, S, Rmin, Rmaj) =
+    let(a = P/2 - S/2, b = P/2 + S/2, e = min(S/1000, P/10000))
+    [ [0, Rmin], [a, Rmin], [a + e, Rmaj],
+      [b - e, Rmaj], [b, Rmin], [P, Rmin] ];
+
+function _tq_table_groove(table, Rmin, Rmaj) =
+    [ for (p = table) [p[0], Rmin + Rmaj - p[1]] ];
+
+function _tq_profile_height(P, S, cf, rf, profile, rect_profile, rect_ratio, flank_angle) =
+      rect_profile       ? S * rect_ratio
+    : profile == "sharp" ? S / (2 * tan(flank_angle))
+    :                      (S - cf - rf) / (2 * tan(flank_angle));
+
+function _tq_lead_mode_valid(mode) =
+    is_undef(mode) || mode == "none" || mode == "start" || mode == "end" || mode == "both";
+function _tq_lead_start(mode, lead_in) =
+    is_undef(mode) ? lead_in : (mode == "start" || mode == "both");
+function _tq_lead_end(mode, lead_out) =
+    is_undef(mode) ? lead_out : (mode == "end" || mode == "both");
+
+// NPT reference taper: 1 unit of diameter change per 16 units of axial length.
+function tq_npt_taper_rate() = 1/16;
+
 // ============================================================================
 //  CORE GEOMETRY  --  helical height-field polyhedron
 // ============================================================================
-module _tq_thread_solid(P, L, Rmaj, Rmin, lead, dir, table, ci, co, na, nz, taper=0) {
+module _tq_thread_solid(P, L, Rmaj, Rmin, lead, dir, table, ci, co, na, nz, taper=0, base_r=undef) {
     dz = L / nz;
+    br = is_undef(base_r) ? Rmin : base_r;
     pts = concat(
         [ for (i = [0:nz], j = [0:na-1])
               let( z  = i * dz,
@@ -124,7 +164,7 @@ module _tq_thread_solid(P, L, Rmaj, Rmin, lead, dir, table, ci, co, na, nz, tape
                    shrink = (taper / 2) * (z / L),       // linear radial taper
                    f  = min( ci > 0 ? min(z/ci, 1) : 1,
                              co > 0 ? min((L - z)/co, 1) : 1 ),
-                   r  = (Rmin - shrink) + (r0 - Rmin) * f )
+                   r  = (br - shrink) + (r0 - br) * f )
               [ r * cos(th), r * sin(th), z ] ],
         [ [0, 0, 0], [0, 0, L] ]                       // bottom & top centres
     );
@@ -195,7 +235,13 @@ module tq_thread(d, pitch, length,
                  arc            = 360,
                  fn             = undef,
                  steps_per_pitch= 16,
-                 center         = false)
+                 center         = false,
+                 thread_size    = undef,
+                 side_angle     = undef,
+                 rect_ratio     = undef,
+                 groove         = false,
+                 taper_rate     = undef,
+                 lead_ends      = undef)
 {
     // -- input validation: fail loudly with a useful message --------------
     assert(is_num(d) && d > 0,
@@ -210,8 +256,9 @@ module tq_thread(d, pitch, length,
            str("tq_thread: arc must be in (0,360], got ", arc));
     assert(hand == "right" || hand == "left",
            str("tq_thread: hand must be \"right\" or \"left\", got ", hand));
-    assert(profile == "flat" || profile == "sharp" || profile == "rounded",
-           str("tq_thread: profile must be flat|sharp|rounded, got ", profile));
+    rect_profile = profile == "square" || profile == "rect" || profile == "rectangle";
+    assert(profile == "flat" || profile == "sharp" || profile == "rounded" || rect_profile,
+           str("tq_thread: profile must be flat|sharp|rounded|square|rect|rectangle, got ", profile));
     assert(is_num(starts) && starts >= 1 && starts == floor(starts),
            str("tq_thread: starts must be an integer >= 1, got ", starts));
     assert(is_num(clearance) && clearance >= 0,
@@ -220,12 +267,23 @@ module tq_thread(d, pitch, length,
            "tq_thread: chamfer must be >= 0 (or undef for auto)");
     assert(is_num(angle) && angle > 0 && angle < 180,
            str("tq_thread: angle (included flank angle) must be in (0,180), got ", angle));
+    assert(is_undef(side_angle) || (is_num(side_angle) && side_angle > 0 && side_angle < 90),
+           str("tq_thread: side_angle (half-angle from perpendicular) must be in (0,90), got ", side_angle));
     assert(is_undef(tooth_height) || (is_num(tooth_height) && tooth_height > 0),
            "tq_thread: tooth_height must be > 0 (or undef to derive from angle)");
     assert(is_num(taper) && taper >= 0,
            str("tq_thread: taper (total dia reduction over length) must be >= 0, got ", taper));
+    assert(is_undef(taper_rate) || (is_num(taper_rate) && taper_rate >= 0),
+           str("tq_thread: taper_rate (dia reduction per axial mm) must be >= 0, got ", taper_rate));
     assert(is_undef(minor_d) || (is_num(minor_d) && minor_d > 0 && minor_d < d),
            str("tq_thread: minor_d must be in (0, d=", d, "), got ", minor_d));
+    assert(is_undef(thread_size) || (is_num(thread_size) && thread_size > 0),
+           str("tq_thread: thread_size must be > 0, got ", thread_size));
+    assert(is_undef(rect_ratio) || (is_num(rect_ratio) && rect_ratio > 0),
+           str("tq_thread: rect_ratio must be > 0, got ", rect_ratio));
+    assert(is_bool(groove), str("tq_thread: groove must be true or false, got ", groove));
+    assert(_tq_lead_mode_valid(lead_ends),
+           str("tq_thread: lead_ends must be none|start|end|both, got ", lead_ends));
     // ISO 965 fit position (optional). Case must match internal/external.
     _fl  = is_undef(fit) ? undef : _tq_fit_letter(fit);
     assert(is_undef(fit) || (internal ? _tq_fit_is_internal(_fl) : _tq_fit_is_external(_fl)),
@@ -233,12 +291,22 @@ module tq_thread(d, pitch, length,
                internal ? "internal thread (G or H, e.g. \"6H\")" : "external thread (e/f/g/h, e.g. \"6g\")"));
 
     P   = pitch;
-    cf  = is_undef(crest_flat) ? P/8 : crest_flat;
-    rf  = is_undef(root_flat)  ? P/4 : root_flat;
-    // radial flank height: explicit, or from minor_d, or derived from the angle.
+    S0  = is_undef(thread_size) ? P : thread_size;
+    rratio = is_undef(rect_ratio) ? (profile == "rectangle" || profile == "rect" ? 1/3 : 1) : rect_ratio;
+    assert(S0 <= P,
+           str("tq_thread: thread_size must be <= pitch to keep adjacent teeth separate; got ", S0, " > ", P));
+    axial_relief = internal && rect_profile ? min(0.1*S0, 0.15) : 0;
+    S   = rect_profile ? min(P, S0 + 2*axial_relief) : S0;
+    cf  = is_undef(crest_flat) ? (profile == "sharp" ? 0 : S/8) : crest_flat;
+    rf  = is_undef(root_flat)  ? (profile == "sharp" ? 0 : S/4) : root_flat;
+    assert(is_num(cf) && cf >= 0 && is_num(rf) && rf >= 0,
+           "tq_thread: crest_flat and root_flat must be >= 0");
+    flank_angle = is_undef(side_angle) ? angle/2 : side_angle;
+    taper_eff = taper + (is_undef(taper_rate) ? 0 : taper_rate * length);
+    // radial flank height: explicit, or from minor_d, or derived from the selected profile.
     h   = !is_undef(tooth_height) ? tooth_height
         : !is_undef(minor_d)      ? (d - minor_d) / 2
-        :                           (P - cf - rf) / (2 * tan(angle/2));
+        :                           _tq_profile_height(P, S0, cf, rf, profile, rect_profile, rratio, flank_angle);
     // tolerance shift (radial): FDM clearance + optional ISO 965 allowance.
     fit_dev = is_undef(fit) ? 0 : _tq_fit_dev_mm(_fl, P);   // diametral (mm)
     off  = (internal ? +1 : -1) * clearance / 2 + fit_dev / 2;
@@ -247,12 +315,12 @@ module tq_thread(d, pitch, length,
     // worst-case core radius: rounded roots dip ~0.5*rr below Rmin, and a taper
     // shrinks everything by taper/2 at the top.
     rmin_floor = (profile == "rounded" ? Rmin - 0.5 * round * 0.1443 * P : Rmin)
-                 - taper / 2;
+                 - taper_eff / 2;
 
     assert(h > 0,
            "tq_thread: flats/angle leave no flank (h <= 0); reduce crest_flat/root_flat");
-    assert(cf + rf < P,
-           "tq_thread: crest_flat + root_flat must be < pitch");
+    assert(rect_profile || cf + rf < S,
+           "tq_thread: crest_flat + root_flat must be < thread_size");
     assert(rmin_floor > 0.05,
            str("tq_thread: thread too deep for d=", d, " pitch=", pitch,
                " (effective minor radius ", rmin_floor,
@@ -262,20 +330,26 @@ module tq_thread(d, pitch, length,
     dir  = (hand == "left") ? -1 : 1;
     nz   = max(2, ceil(length / P * steps_per_pitch));
     ch   = is_undef(chamfer) ? h : chamfer;
-    ci   = lead_in  ? ch : 0;
-    co   = lead_out ? ch : 0;
+    li   = _tq_lead_start(lead_ends, lead_in);
+    lo   = _tq_lead_end(lead_ends, lead_out);
+    ci   = li ? ch : 0;
+    co   = lo ? ch : 0;
     na   = _tq_aseg(d, fn);
 
-    table = (profile == "sharp")   ? _tq_table_sharp(P, Rmin, Rmaj)
-          : (profile == "rounded") ? _tq_table_round(P, Rmin, Rmaj, round, 6)
-          :                          _tq_table_flat (P, Rmin, Rmaj, cf, rf);
+    base_table = rect_profile       ? _tq_table_rect(P, S, Rmin, Rmaj)
+               : (profile == "sharp" && S < P) ? _tq_table_narrow_sharp(P, S, Rmin, Rmaj)
+               : (profile == "sharp")          ? _tq_table_sharp(P, Rmin, Rmaj)
+               : (profile == "rounded" && S == P) ? _tq_table_round(P, Rmin, Rmaj, round, 6)
+               :                                   _tq_table_narrow_flat(P, S, Rmin, Rmaj, cf, rf);
+    table = groove ? _tq_table_groove(base_table, Rmin, Rmaj) : base_table;
+    base_r = groove ? Rmaj : Rmin;
 
     translate([0, 0, center ? -length/2 : 0])
         if (arc >= 360)
-            _tq_thread_solid(P, length, Rmaj, Rmin, lead, dir, table, ci, co, na, nz, taper);
+            _tq_thread_solid(P, length, Rmaj, Rmin, lead, dir, table, ci, co, na, nz, taper_eff, base_r);
         else
             intersection() {
-                _tq_thread_solid(P, length, Rmaj, Rmin, lead, dir, table, ci, co, na, nz, taper);
+                _tq_thread_solid(P, length, Rmaj, Rmin, lead, dir, table, ci, co, na, nz, taper_eff, base_r);
                 translate([0, 0, -1])
                     linear_extrude(length + 2) _tq_sector(arc, Rmaj + 1, na);
             }
@@ -360,26 +434,50 @@ function tq_presets_selfcheck(i = 0) =
         && tq_preset(TQ_PRESETS[i][0]) == [TQ_PRESETS[i][1], TQ_PRESETS[i][2]] )
       ? tq_presets_selfcheck(i + 1) : false;
 
-// Thread by preset name.  Extra args forwarded to tq_thread().
+// Thread by preset name.  Profile/control args forward to tq_thread().
 module tq_thread_preset(name, length, internal=false, starts=1, hand="right",
                         clearance=0.4, profile="flat", lead_in=true,
-                        lead_out=true, fn=undef, center=false) {
+                        lead_out=true, fn=undef, center=false,
+                        fit=undef, angle=60, tooth_height=undef, minor_d=undef,
+                        crest_flat=undef, root_flat=undef, round=1,
+                        chamfer=undef, taper=0, arc=360, steps_per_pitch=16,
+                        thread_size=undef, side_angle=undef, rect_ratio=undef,
+                        groove=false, taper_rate=undef, lead_ends=undef) {
     p = tq_preset(name);
     assert(!is_undef(p), str("tq_thread_preset: unknown preset '", name,
                              "' (see TQ_PRESETS / README)"));
     tq_thread(d=p[0], pitch=p[1], length=length, internal=internal,
-              starts=starts, hand=hand, clearance=clearance, profile=profile,
-              lead_in=lead_in, lead_out=lead_out, fn=fn, center=center);
+              starts=starts, hand=hand, clearance=clearance, fit=fit,
+              profile=profile, angle=angle, tooth_height=tooth_height,
+              minor_d=minor_d, crest_flat=crest_flat, root_flat=root_flat,
+              round=round, lead_in=lead_in, lead_out=lead_out,
+              chamfer=chamfer, taper=taper, arc=arc, fn=fn,
+              steps_per_pitch=steps_per_pitch, center=center,
+              thread_size=thread_size, side_angle=side_angle,
+              rect_ratio=rect_ratio, groove=groove, taper_rate=taper_rate,
+              lead_ends=lead_ends);
 }
 
 // Thread specified by threads-per-inch instead of pitch.
 module tq_thread_tpi(d, tpi, length, internal=false, starts=1, hand="right",
                      clearance=0.4, profile="flat", lead_in=true, lead_out=true,
-                     fn=undef, center=false) {
+                     fn=undef, center=false,
+                     fit=undef, angle=60, tooth_height=undef, minor_d=undef,
+                     crest_flat=undef, root_flat=undef, round=1,
+                     chamfer=undef, taper=0, arc=360, steps_per_pitch=16,
+                     thread_size=undef, side_angle=undef, rect_ratio=undef,
+                     groove=false, taper_rate=undef, lead_ends=undef) {
     assert(is_num(tpi) && tpi > 0, str("tq_thread_tpi: tpi must be > 0, got ", tpi));
     tq_thread(d=d, pitch=25.4/tpi, length=length, internal=internal,
-              starts=starts, hand=hand, clearance=clearance, profile=profile,
-              lead_in=lead_in, lead_out=lead_out, fn=fn, center=center);
+              starts=starts, hand=hand, clearance=clearance, fit=fit,
+              profile=profile, angle=angle, tooth_height=tooth_height,
+              minor_d=minor_d, crest_flat=crest_flat, root_flat=root_flat,
+              round=round, lead_in=lead_in, lead_out=lead_out,
+              chamfer=chamfer, taper=taper, arc=arc, fn=fn,
+              steps_per_pitch=steps_per_pitch, center=center,
+              thread_size=thread_size, side_angle=side_angle,
+              rect_ratio=rect_ratio, groove=groove, taper_rate=taper_rate,
+              lead_ends=lead_ends);
 }
 
 // ============================================================================
@@ -658,7 +756,7 @@ module tq_countersunk_bolt(d, pitch, length, head_d=undef, head_angle=90,
 //   pitch        coarse pitch (default 0.6*d)        head   "countersunk"|"pan"|"none"
 //   point        "gimlet" (sharp) | "cone" | "flat"  (bool true=gimlet, false=flat)
 //   taper        diameter reduction over the threaded length (toward the tip)
-//   core_d       core/root diameter (sets thread depth)   thread_depth  radial depth (overrides core_d)
+//   core_d       core/root diameter (sets thread depth)   thread_depth  radial depth (overrides default/core_d)
 //   shank        smooth unthreaded shank length under the head (dia ~ core)
 module tq_wood_screw(d, length, pitch=undef, head="countersunk", head_d=undef,
                      point="gimlet", taper=0, core_d=undef, thread_depth=undef,
@@ -681,7 +779,9 @@ module tq_wood_screw(d, length, pitch=undef, head="countersunk", head_d=undef,
     tl   = length - shank;                                  // threaded/body length
     tipL = min(tipL0, tl);
     tipD = pt=="cone" ? d*0.4 : 0.2;
-    md   = is_undef(thread_depth) ? core_d : undef;        // don't pass both
+    default_depth = min(0.541266 * p, d * 0.32);           // printable coarse tooth, not a full sharp-V depth
+    td   = is_undef(thread_depth) && is_undef(core_d) ? default_depth : thread_depth;
+    md   = is_undef(td) ? core_d : undef;                  // don't pass both
     shd  = is_undef(core_d) ? d*0.72 : core_d;             // reduced smooth shank
     bodyL = tl - tipL;
     union() {
@@ -698,7 +798,7 @@ module tq_wood_screw(d, length, pitch=undef, head="countersunk", head_d=undef,
                 translate([0,0,-TQ_EPS])
                     tq_thread(d=d, pitch=p, length=bodyL + TQ_EPS, hand=hand,
                               clearance=clearance, profile="sharp",
-                              tooth_height=thread_depth, minor_d=md, taper=taper,
+                              tooth_height=td, minor_d=md, taper=taper,
                               lead_in=false, lead_out=false, fn=fn);
             if (tipL > 0)
                 translate([0,0,bodyL - TQ_EPS])

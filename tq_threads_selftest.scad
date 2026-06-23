@@ -37,5 +37,29 @@ assert(_tq_fit_dev_mm("h", 1.0) == 0,                                  "SELFTEST
 assert(abs(_tq_fit_dev_mm("G", 1.5)*1000 - ( 15 + 11*1.5)) < 1e-9,     "SELFTEST: EI(G)");
 assert(_tq_fit_dev_mm("H", 1.0) == 0,                                  "SELFTEST: EI(H)=0");
 
-echo(str("SELFTEST PASS: ", tq_preset_count(), " presets, table + ISO 965 formulae OK"));
+// -- v0.6 profile-control geometry -----------------------------------------
+P2 = 2;
+S1 = 1;
+assert(abs(_tq_profile_height(P2, P2, 0, 0, "sharp", false, 1, 30) - _TQ_H * P2) < 1e-6,
+       "SELFTEST: sharp profile is a full 60-degree V by default");
+assert(abs(_tq_profile_height(4, S1, 0, 0, "sharp", false, 1, 30) - (_TQ_H * S1)) < 1e-6,
+       "SELFTEST: side_angle=30 maps thread_size to a 60-degree V");
+assert(abs(_tq_profile_height(4, 3, 0, 0, "rectangle", true, 1/3, 30) - 1) < 1e-9,
+       "SELFTEST: rectangle rect_ratio controls depth");
+assert(abs(tq_npt_taper_rate() - 1/16) < 1e-12,
+       "SELFTEST: NPT reference taper rate");
+rect_tbl = _tq_table_rect(4, 2, 4, 5);
+groove_tbl = _tq_table_groove(rect_tbl, 4, 5);
+assert(abs(lookup(2, rect_tbl) - 5) < 1e-9 && abs(lookup(2, groove_tbl) - 4) < 1e-9,
+       "SELFTEST: groove profile inverts the tooth into the base cylinder");
+assert(_tq_lead_start("start", false) && !_tq_lead_end("start", true),
+       "SELFTEST: lead_ends=start selects only the start");
+assert(!_tq_lead_start("end", true) && _tq_lead_end("end", false),
+       "SELFTEST: lead_ends=end selects only the end");
+assert(_tq_lead_start("both", false) && _tq_lead_end("both", false),
+       "SELFTEST: lead_ends=both selects both ends");
+assert(!_tq_lead_start("none", true) && !_tq_lead_end("none", true),
+       "SELFTEST: lead_ends=none disables both ends");
+
+echo(str("SELFTEST PASS: ", tq_preset_count(), " presets, table + ISO 965 + profile-control formulae OK"));
 cube(0.1);   // trivial geometry so STL export succeeds
